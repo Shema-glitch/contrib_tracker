@@ -1,7 +1,5 @@
-
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import { and, desc, eq, gte, isNull, sql } from "drizzle-orm";
+import { db } from "./db";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import {
   members,
@@ -14,106 +12,17 @@ import {
   type InsertMember,
   type InsertContribution,
   type InsertLoan,
-} from "./db";
-
-const sqlite = new Database("database.sqlite");
-const db = drizzle(sqlite);
+} from "@shared/schema";
 
 export class Storage {
   async init() {
-    // Create tables if they don't exist
-    await db.run(sql`
-      CREATE TABLE IF NOT EXISTS members (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        phone TEXT,
-        total_contributions TEXT DEFAULT '0',
-        join_date TEXT NOT NULL,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    await db.run(sql`
-      CREATE TABLE IF NOT EXISTS contributions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        member_id INTEGER NOT NULL,
-        amount TEXT NOT NULL,
-        month TEXT NOT NULL,
-        payment_date TEXT,
-        is_paid BOOLEAN DEFAULT FALSE,
-        late_fee TEXT DEFAULT '0',
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (member_id) REFERENCES members (id) ON DELETE CASCADE
-      )
-    `);
-
-    await db.run(sql`
-      CREATE TABLE IF NOT EXISTS loans (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        member_id INTEGER NOT NULL,
-        amount TEXT NOT NULL,
-        issue_date TEXT NOT NULL,
-        due_date TEXT NOT NULL,
-        status TEXT DEFAULT 'active',
-        notes TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (member_id) REFERENCES members (id) ON DELETE CASCADE
-      )
-    `);
-
-    await db.run(sql`
-      CREATE TABLE IF NOT EXISTS penalties (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        member_id INTEGER NOT NULL,
-        type TEXT NOT NULL,
-        amount TEXT NOT NULL,
-        reason TEXT NOT NULL,
-        date_applied TEXT NOT NULL,
-        is_waived BOOLEAN DEFAULT FALSE,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (member_id) REFERENCES members (id) ON DELETE CASCADE
-      )
-    `);
-
-    await db.run(sql`
-      CREATE TABLE IF NOT EXISTS settings (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        key TEXT UNIQUE NOT NULL,
-        value TEXT NOT NULL,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    await db.run(sql`
-      CREATE TABLE IF NOT EXISTS otp_tokens (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT NOT NULL,
-        token TEXT NOT NULL,
-        expires_at TEXT NOT NULL,
-        is_used BOOLEAN DEFAULT FALSE,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    await db.run(sql`
-      CREATE TABLE IF NOT EXISTS admins (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT UNIQUE NOT NULL,
-        password_hash TEXT,
-        name TEXT NOT NULL,
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    console.log("Database initialized successfully");
+    console.log("Database connection initialized successfully");
   }
 
   // Admin methods
   async createAdmin(email: string, name: string, password?: string) {
     const passwordHash = password ? bcrypt.hashSync(password, 10) : null;
-    
+
     const [admin] = await db
       .insert(admins)
       .values({
@@ -155,7 +64,7 @@ export class Storage {
     await db.insert(otpTokens).values({
       email,
       token,
-      expiresAt: expiresAt.toISOString(),
+      expiresAt,
     });
   }
 
@@ -168,7 +77,7 @@ export class Storage {
           eq(otpTokens.email, email),
           eq(otpTokens.token, token),
           eq(otpTokens.isUsed, false),
-          gte(otpTokens.expiresAt, new Date().toISOString())
+          gte(otpTokens.expiresAt, new Date())
         )
       )
       .limit(1);
@@ -206,7 +115,7 @@ export class Storage {
     if (member) {
       const currentTotal = parseFloat(member.totalContributions || "0");
       const newTotal = currentTotal + parseFloat(amount);
-      
+
       await db
         .update(members)
         .set({ totalContributions: newTotal.toString() })
@@ -322,7 +231,7 @@ export class Storage {
       .from(members);
 
     const totalContributions = await db
-      .select({ sum: sql<string>`sum(cast(amount as real))` })
+      .select({ sum: sql<string>`sum(cast(amount as decimal))` })
       .from(contributions)
       .where(eq(contributions.isPaid, true));
 
@@ -332,7 +241,7 @@ export class Storage {
       .where(eq(loans.status, "active"));
 
     const totalPenalties = await db
-      .select({ sum: sql<string>`sum(cast(amount as real))` })
+      .select({ sum: sql<string>`sum(cast(amount as decimal))` })
       .from(penalties)
       .where(eq(penalties.isWaived, false));
 
