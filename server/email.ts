@@ -1,30 +1,29 @@
 import nodemailer from 'nodemailer';
 
-// Configure your email transporter
 const transporter = nodemailer.createTransporter({
-  service: 'gmail', // or your preferred email service
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: false,
   auth: {
-    user: process.env.EMAIL_USER || process.env.SMTP_USER,
-    pass: process.env.EMAIL_PASS || process.env.SMTP_PASS,
+    user: process.env.SMTP_USER || process.env.EMAIL_USER || 'your-email@gmail.com',
+    pass: process.env.SMTP_PASS || process.env.EMAIL_PASS || 'your-app-password',
   },
 });
 
-export async function sendOtpEmail(to: string, code: string): Promise<void> {
+export async function sendOtpEmail(email: string, token: string): Promise<void> {
   const mailOptions = {
-    from: process.env.EMAIL_USER || process.env.SMTP_USER,
-    to,
-    subject: 'Member Contribution Manager - OTP Verification',
+    from: process.env.SMTP_USER || process.env.EMAIL_USER || 'noreply@financeflow.com',
+    to: email,
+    subject: 'Your OTP Code - Member Contribution Manager',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #1e40af;">Member Contribution Manager</h2>
-        <p>Your OTP verification code is:</p>
-        <div style="background: #f3f4f6; padding: 20px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #1e40af;">
-          ${code}
+        <h2 style="color: #1e40af;">Your OTP Code</h2>
+        <p>Your one-time password for accessing the Member Contribution Manager is:</p>
+        <div style="background-color: #f3f4f6; padding: 20px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 3px; margin: 20px 0;">
+          ${token}
         </div>
-        <p>This code will expire in 10 minutes.</p>
-        <p style="color: #6b7280; font-size: 14px;">
-          If you didn't request this code, please ignore this email.
-        </p>
+        <p style="color: #6b7280;">This code will expire in 10 minutes.</p>
+        <p style="color: #6b7280;">If you didn't request this code, please ignore this email.</p>
       </div>
     `,
   };
@@ -32,28 +31,23 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
   await transporter.sendMail(mailOptions);
 }
 
-export async function sendContributionReminder(to: string, memberName: string, month: string): Promise<void> {
+export async function sendContributionReminder(email: string, name: string, month: string): Promise<void> {
   const mailOptions = {
-    from: process.env.EMAIL_USER || process.env.SMTP_USER,
-    to,
+    from: process.env.SMTP_USER || process.env.EMAIL_USER || 'noreply@financeflow.com',
+    to: email,
     subject: 'Monthly Contribution Reminder',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #1e40af;">Monthly Contribution Reminder</h2>
-        <p>Dear ${memberName},</p>
-        <p>This is a friendly reminder that your monthly contribution of <strong>5,000 RWF</strong> for ${month} is due by the 15th of this month.</p>
-        <div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 8px; margin: 20px 0;">
-          <p style="color: #92400e; margin: 0;">
-            <strong>Important:</strong> Late payments will incur a penalty of 1,000 RWF if paid after the due date.
-          </p>
+        <p>Dear ${name},</p>
+        <p>This is a friendly reminder that your monthly contribution for <strong>${month}</strong> is due.</p>
+        <div style="background-color: #fef3c7; padding: 15px; border-left: 4px solid #f59e0b; margin: 20px 0;">
+          <p style="margin: 0;"><strong>Amount Due:</strong> 5,000 RWF</p>
+          <p style="margin: 5px 0 0 0;"><strong>Due Date:</strong> 15th of the month</p>
         </div>
-        <p>Please ensure your contribution is made on time to avoid any penalties.</p>
-        <p>Thank you for your continued participation!</p>
-        <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
-        <p style="color: #6b7280; font-size: 14px;">
-          Member Contribution & Loan Manager<br>
-          This is an automated message.
-        </p>
+        <p style="color: #dc2626; font-weight: bold;">Note: Late payments after the 15th of the following month will incur a 1,000 RWF penalty.</p>
+        <p>Please contact the administrator if you have any questions.</p>
+        <p>Thank you for your participation!</p>
       </div>
     `,
   };
@@ -61,34 +55,24 @@ export async function sendContributionReminder(to: string, memberName: string, m
   await transporter.sendMail(mailOptions);
 }
 
-export async function sendLoanReminder(to: string, memberName: string, amount: number, dueDate: Date): Promise<void> {
-  const formattedDueDate = dueDate.toLocaleDateString();
-  
+export async function sendLoanApprovalEmail(email: string, name: string, amount: string, dueDate: string): Promise<void> {
   const mailOptions = {
-    from: process.env.EMAIL_USER || process.env.SMTP_USER,
-    to,
-    subject: 'Loan Repayment Reminder',
+    from: process.env.SMTP_USER || process.env.EMAIL_USER || 'noreply@financeflow.com',
+    to: email,
+    subject: 'Loan Approval Notification',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #1e40af;">Loan Repayment Reminder</h2>
-        <p>Dear ${memberName},</p>
-        <p>This is a reminder about your loan repayment:</p>
-        <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <p><strong>Loan Amount:</strong> ${amount.toLocaleString()} RWF</p>
-          <p><strong>Due Date:</strong> ${formattedDueDate}</p>
+        <h2 style="color: #059669;">Loan Approved!</h2>
+        <p>Dear ${name},</p>
+        <p>Congratulations! Your loan application has been approved.</p>
+        <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #1e40af;">Loan Details:</h3>
+          <p><strong>Amount:</strong> ${amount} RWF</p>
+          <p><strong>Due Date:</strong> ${dueDate}</p>
+          <p style="color: #dc2626;"><strong>Important:</strong> Late repayment will incur a 30,000 RWF penalty.</p>
         </div>
-        <div style="background: #fecaca; border: 1px solid #ef4444; padding: 15px; border-radius: 8px; margin: 20px 0;">
-          <p style="color: #b91c1c; margin: 0;">
-            <strong>Warning:</strong> Overdue loans will incur a penalty of 30,000 RWF.
-          </p>
-        </div>
-        <p>Please ensure your loan is repaid by the due date to avoid penalties.</p>
-        <p>Thank you!</p>
-        <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
-        <p style="color: #6b7280; font-size: 14px;">
-          Member Contribution & Loan Manager<br>
-          This is an automated message.
-        </p>
+        <p>Please ensure timely repayment to avoid penalties.</p>
+        <p>Thank you for your participation in our member contribution program!</p>
       </div>
     `,
   };
@@ -96,27 +80,23 @@ export async function sendLoanReminder(to: string, memberName: string, amount: n
   await transporter.sendMail(mailOptions);
 }
 
-export async function sendLatePaymentNotice(to: string, memberName: string, amount: number): Promise<void> {
+export async function sendPenaltyNotification(email: string, name: string, penaltyType: string, amount: string, reason: string): Promise<void> {
   const mailOptions = {
-    from: process.env.EMAIL_USER || process.env.SMTP_USER,
-    to,
-    subject: 'Late Payment Penalty Applied',
+    from: process.env.SMTP_USER || process.env.EMAIL_USER || 'noreply@financeflow.com',
+    to: email,
+    subject: 'Penalty Applied - Action Required',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #ef4444;">Late Payment Penalty Notice</h2>
-        <p>Dear ${memberName},</p>
-        <p>A late payment penalty has been applied to your account:</p>
-        <div style="background: #fecaca; border: 1px solid #ef4444; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <p style="color: #b91c1c;"><strong>Penalty Amount:</strong> ${amount.toLocaleString()} RWF</p>
-          <p style="color: #b91c1c;">Reason: Late monthly contribution payment</p>
+        <h2 style="color: #dc2626;">Penalty Applied</h2>
+        <p>Dear ${name},</p>
+        <p>A penalty has been applied to your account due to the following reason:</p>
+        <div style="background-color: #fef2f2; padding: 15px; border-left: 4px solid #dc2626; margin: 20px 0;">
+          <p style="margin: 0;"><strong>Penalty Type:</strong> ${penaltyType}</p>
+          <p style="margin: 5px 0;"><strong>Amount:</strong> ${amount} RWF</p>
+          <p style="margin: 5px 0 0 0;"><strong>Reason:</strong> ${reason}</p>
         </div>
-        <p>Please make your payment as soon as possible to bring your account current.</p>
-        <p>If you have any questions, please contact the administrator.</p>
-        <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
-        <p style="color: #6b7280; font-size: 14px;">
-          Member Contribution & Loan Manager<br>
-          This is an automated message.
-        </p>
+        <p>Please contact the administrator to resolve this penalty or arrange payment.</p>
+        <p>To avoid future penalties, please ensure timely payments of contributions and loan repayments.</p>
       </div>
     `,
   };

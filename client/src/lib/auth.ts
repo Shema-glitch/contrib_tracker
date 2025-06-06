@@ -1,157 +1,130 @@
 import { apiRequest } from "./queryClient";
 
-export interface User {
-  id: number;
+export interface AuthUser {
   email: string;
-  role: string;
+  name: string;
+  isActive: boolean;
 }
 
-export interface AuthResponse {
-  token: string;
-  user: User;
-}
+export class AuthService {
+  private static instance: AuthService;
 
-class AuthService {
-  private token: string | null = null;
-  private user: User | null = null;
+  private constructor() {}
 
-  constructor() {
-    // Load auth data from localStorage on initialization
-    this.loadAuthData();
-  }
-
-  private loadAuthData() {
-    if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('auth_token');
-      const userData = localStorage.getItem('auth_user');
-      if (userData) {
-        try {
-          this.user = JSON.parse(userData);
-        } catch (error) {
-          console.error('Error parsing user data from localStorage:', error);
-          this.clearAuthData();
-        }
-      }
+  public static getInstance(): AuthService {
+    if (!AuthService.instance) {
+      AuthService.instance = new AuthService();
     }
+    return AuthService.instance;
   }
 
-  private saveAuthData(token: string, user: User) {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('auth_token', token);
-      localStorage.setItem('auth_user', JSON.stringify(user));
-    }
-    this.token = token;
-    this.user = user;
-  }
-
-  private clearAuthData() {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('auth_user');
-    }
-    this.token = null;
-    this.user = null;
-  }
-
-  async sendOTP(email: string): Promise<{ success: boolean; message: string }> {
+  async sendOtp(email: string): Promise<{ success: boolean; message?: string }> {
     try {
-      const response = await apiRequest('POST', '/api/auth/send-otp', { email });
-      const data = await response.json();
-      return { success: true, message: data.message };
+      await apiRequest("POST", "/api/auth/send-otp", { email });
+      return { success: true };
     } catch (error: any) {
-      return { success: false, message: error.message || 'Failed to send OTP' };
-    }
-  }
-
-  async verifyOTP(email: string, otp: string): Promise<{ success: boolean; message: string; data?: AuthResponse }> {
-    try {
-      const response = await apiRequest('POST', '/api/auth/verify-otp', { email, otp });
-      const data: AuthResponse = await response.json();
-      
-      this.saveAuthData(data.token, data.user);
-      
-      return { success: true, message: 'Login successful', data };
-    } catch (error: any) {
-      return { success: false, message: error.message || 'OTP verification failed' };
-    }
-  }
-
-  async createAdmin(email: string, password: string): Promise<{ success: boolean; message: string }> {
-    try {
-      const response = await apiRequest('POST', '/api/auth/create-admin', { email, password });
-      const data = await response.json();
-      return { success: true, message: data.message };
-    } catch (error: any) {
-      return { success: false, message: error.message || 'Failed to create admin account' };
-    }
-  }
-
-  logout() {
-    this.clearAuthData();
-    // Redirect to login page
-    window.location.href = '/login';
-  }
-
-  isAuthenticated(): boolean {
-    return !!(this.token && this.user);
-  }
-
-  getToken(): string | null {
-    return this.token;
-  }
-
-  getUser(): User | null {
-    return this.user;
-  }
-
-  getAuthHeaders(): Record<string, string> {
-    if (this.token) {
-      return {
-        'Authorization': `Bearer ${this.token}`,
+      return { 
+        success: false, 
+        message: error.message || "Failed to send OTP" 
       };
     }
-    return {};
+  }
+
+  async verifyOtp(email: string, token: string): Promise<{ success: boolean; message?: string }> {
+    try {
+      await apiRequest("POST", "/api/auth/verify-otp", { email, token });
+      return { success: true };
+    } catch (error: any) {
+      return { 
+        success: false, 
+        message: error.message || "Invalid or expired OTP" 
+      };
+    }
+  }
+
+  async logout(): Promise<void> {
+    try {
+      await apiRequest("POST", "/api/auth/logout");
+    } catch (error) {
+      // Continue with logout even if server request fails
+      console.error("Logout error:", error);
+    }
+  }
+
+  async getCurrentUser(): Promise<AuthUser | null> {
+    try {
+      // Try to fetch dashboard stats to verify authentication
+      await apiRequest("GET", "/api/dashboard/stats");
+      // If successful, we're authenticated
+      // In a real app, you'd have a proper user endpoint
+      return {
+        email: "admin@example.com",
+        name: "Admin User", 
+        isActive: true
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async requireOtpForSensitiveOperation(
+    operation: string,
+    email: string
+  ): Promise<{ success: boolean; token?: string; message?: string }> {
+    try {
+      // Send OTP for sensitive operation
+      await this.sendOtp(email);
+      return { 
+        success: true, 
+        message: "OTP sent for verification" 
+      };
+    } catch (error: any) {
+      return { 
+        success: false, 
+        message: error.message || "Failed to send OTP for verification" 
+      };
+    }
+  }
+
+  async verifyOtpForSensitiveOperation(
+    email: string,
+    token: string,
+    operation: string
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      const result = await this.verifyOtp(email, token);
+      if (result.success) {
+        return { 
+          success: true, 
+          message: `${operation} authorized successfully` 
+        };
+      }
+      return result;
+    } catch (error: any) {
+      return { 
+        success: false, 
+        message: error.message || "OTP verification failed" 
+      };
+    }
+  }
+
+  // Utility methods for checking permissions
+  canPerformSensitiveOperation(): boolean {
+    // In a real app, you'd check user permissions here
+    return true;
+  }
+
+  requiresOtpVerification(operation: string): boolean {
+    const sensitiveOperations = [
+      "delete_member",
+      "waive_penalty",
+      "modify_loan",
+      "export_sensitive_data",
+      "change_settings"
+    ];
+    
+    return sensitiveOperations.includes(operation);
   }
 }
 
-export const authService = new AuthService();
-
-// Helper function to check if user is authenticated and redirect if not
-export function requireAuth(): boolean {
-  if (!authService.isAuthenticated()) {
-    window.location.href = '/login';
-    return false;
-  }
-  return true;
-}
-
-// Helper function for making authenticated API requests
-export async function authenticatedRequest(
-  method: string,
-  url: string,
-  data?: unknown
-): Promise<Response> {
-  const headers = {
-    ...authService.getAuthHeaders(),
-    ...(data ? { "Content-Type": "application/json" } : {}),
-  };
-
-  const response = await fetch(url, {
-    method,
-    headers,
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
-
-  if (response.status === 401) {
-    authService.logout();
-    throw new Error('Authentication required');
-  }
-
-  if (!response.ok) {
-    const text = (await response.text()) || response.statusText;
-    throw new Error(`${response.status}: ${text}`);
-  }
-
-  return response;
-}
+export const authService = AuthService.getInstance();
