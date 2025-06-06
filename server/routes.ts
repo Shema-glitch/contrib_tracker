@@ -47,6 +47,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, message: "OTP sent successfully" });
     } catch (error) {
       console.error("Error sending OTP:", error);
+      if (error.code === 'EAUTH') {
+        console.error("Email authentication failed. Please check your Gmail app password.");
+      }
       res.status(500).json({ message: "Failed to send OTP" });
     }
   });

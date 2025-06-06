@@ -5,14 +5,14 @@ const transporter = nodemailer.createTransport({
   port: parseInt(process.env.SMTP_PORT || '587'),
   secure: false,
   auth: {
-    user: process.env.SMTP_USER || process.env.EMAIL_USER || 'your-email@gmail.com',
-    pass: process.env.SMTP_PASS || process.env.EMAIL_PASS || 'your-app-password',
+    user: process.env.SMTP_USER || process.env.EMAIL_USER || 'charmantshema112@gmail.com',
+    pass: process.env.SMTP_PASS || process.env.EMAIL_PASS || 'weiu bwce dfxe ngby',
   },
 });
 
 export async function sendOtpEmail(email: string, token: string): Promise<void> {
   const mailOptions = {
-    from: process.env.SMTP_USER || process.env.EMAIL_USER || 'noreply@financeflow.com',
+    from: process.env.SMTP_USER || process.env.EMAIL_USER || 'charmantshema112@gmail.com',
     to: email,
     subject: 'Your OTP Code - Member Contribution Manager',
     html: `
@@ -33,7 +33,7 @@ export async function sendOtpEmail(email: string, token: string): Promise<void> 
 
 export async function sendContributionReminder(email: string, name: string, month: string): Promise<void> {
   const mailOptions = {
-    from: process.env.SMTP_USER || process.env.EMAIL_USER || 'noreply@financeflow.com',
+    from: process.env.SMTP_USER || process.env.EMAIL_USER || 'charmantshema112@gmail.com',
     to: email,
     subject: 'Monthly Contribution Reminder',
     html: `
@@ -57,7 +57,7 @@ export async function sendContributionReminder(email: string, name: string, mont
 
 export async function sendLoanApprovalEmail(email: string, name: string, amount: string, dueDate: string): Promise<void> {
   const mailOptions = {
-    from: process.env.SMTP_USER || process.env.EMAIL_USER || 'noreply@financeflow.com',
+    from: process.env.SMTP_USER || process.env.EMAIL_USER || 'charmantshema112@gmail.com',
     to: email,
     subject: 'Loan Approval Notification',
     html: `
@@ -82,7 +82,7 @@ export async function sendLoanApprovalEmail(email: string, name: string, amount:
 
 export async function sendPenaltyNotification(email: string, name: string, penaltyType: string, amount: string, reason: string): Promise<void> {
   const mailOptions = {
-    from: process.env.SMTP_USER || process.env.EMAIL_USER || 'noreply@financeflow.com',
+    from: process.env.SMTP_USER || process.env.EMAIL_USER || 'charmantshema112@gmail.com',
     to: email,
     subject: 'Penalty Applied - Action Required',
     html: `
