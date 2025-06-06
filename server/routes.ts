@@ -27,6 +27,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
   app.post("/api/auth/send-otp", async (req, res) => {
     try {
+      console.log("Request body:", req.body);
+      console.log("Email received:", req.body.email);
       const { email } = sendOtpSchema.parse(req.body);
       
       // Check if admin exists

@@ -1,5 +1,6 @@
 
-import { Pool } from '@neondatabase/serverless';
+import pg from 'pg';
+const { Client } = pg;
 
 async function createAdmin() {
   if (!process.env.DATABASE_URL) {
@@ -7,10 +8,15 @@ async function createAdmin() {
     process.exit(1);
   }
 
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const client = new Client({ 
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  });
   
   try {
-    const result = await pool.query(`
+    await client.connect();
+    
+    const result = await client.query(`
       INSERT INTO admins (email, name, is_active) 
       VALUES ($1, $2, $3) 
       ON CONFLICT (email) DO UPDATE SET 
@@ -23,7 +29,7 @@ async function createAdmin() {
   } catch (error) {
     console.error('Error creating admin:', error);
   } finally {
-    await pool.end();
+    await client.end();
   }
 }
 
