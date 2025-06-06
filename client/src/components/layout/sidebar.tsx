@@ -32,19 +32,19 @@ const NavItem = ({ item, isActive }: { item: typeof navigation[0]; isActive: boo
     transition={{ duration: 0.2 }}
   >
     <Link href={item.href}>
-      <Button
-        variant={isActive ? "secondary" : "ghost"}
-        className={cn(
-          "w-full justify-start",
-          isActive && "bg-sidebar-accent text-sidebar-accent-foreground border-r-2 border-sidebar-primary"
-        )}
-      >
-        <item.icon className="mr-3 h-4 w-4" />
-        {item.name}
-      </Button>
-    </Link>
+                <Button
+                  variant={isActive ? "secondary" : "ghost"}
+                  className={cn(
+                    "w-full justify-start",
+                    isActive && "bg-sidebar-accent text-sidebar-accent-foreground border-r-2 border-sidebar-primary"
+                  )}
+                >
+                  <item.icon className="mr-3 h-4 w-4" />
+                  {item.name}
+                </Button>
+              </Link>
   </motion.div>
-);
+            );
 
 export default function Sidebar() {
   const [location] = useLocation();
@@ -78,27 +78,27 @@ export default function Sidebar() {
         {navigation.map((item) => {
           const isActive = location === item.href || (item.href === "/dashboard" && location === "/");
           return <NavItem key={item.name} item={item} isActive={isActive} />;
-        })}
-      </nav>
+          })}
+        </nav>
 
-      {/* User Profile Section */}
+        {/* User Profile Section */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
         className="flex-shrink-0 px-4 py-4 border-t border-sidebar-border"
       >
-        <div className="flex items-center">
-          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-            <span className="text-primary-foreground text-sm font-medium">A</span>
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+              <span className="text-primary-foreground text-sm font-medium">A</span>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-sidebar-foreground">Admin User</p>
+              <p className="text-xs text-muted-foreground">Administrator</p>
+            </div>
           </div>
-          <div className="ml-3">
-            <p className="text-sm font-medium text-sidebar-foreground">Admin User</p>
-            <p className="text-xs text-muted-foreground">Administrator</p>
-          </div>
-        </div>
       </motion.div>
-    </div>
+        </div>
   );
 
   return (

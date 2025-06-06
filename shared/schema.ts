@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, decimal, timestamp, varchar, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, decimal, timestamp, varchar, date, json } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -81,6 +81,13 @@ export const settings = pgTable("settings", {
   key: varchar("key", { length: 100 }).notNull().unique(),
   value: text("value").notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Sessions table
+export const sessions = pgTable("sessions", {
+  sid: text("sid").primaryKey(),
+  sess: json("sess").notNull(),
+  expire: timestamp("expire").notNull()
 });
 
 // Relations

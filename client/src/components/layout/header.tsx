@@ -90,13 +90,13 @@ export default function Header() {
             {/* Quick Actions */}
             <div className="hidden sm:flex space-x-2">
               <Button onClick={() => setShowPaymentModal(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Record Payment
-              </Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Record Payment
+            </Button>
               <Button onClick={() => setShowLoanModal(true)} variant="secondary">
-                <DollarSign className="h-4 w-4 mr-2" />
-                Add Loan
-              </Button>
+              <DollarSign className="h-4 w-4 mr-2" />
+              Add Loan
+            </Button>
             </div>
 
             {/* Mobile Quick Actions */}
@@ -146,10 +146,10 @@ export default function Header() {
 
       <AnimatePresence>
         {showPaymentModal && (
-          <PaymentModal open={showPaymentModal} onOpenChange={setShowPaymentModal} />
+      <PaymentModal open={showPaymentModal} onOpenChange={setShowPaymentModal} />
         )}
         {showLoanModal && (
-          <LoanModal open={showLoanModal} onOpenChange={setShowLoanModal} />
+      <LoanModal open={showLoanModal} onOpenChange={setShowLoanModal} />
         )}
       </AnimatePresence>
     </>

@@ -4,6 +4,10 @@ import { storage } from "./storage";
 import { sendOtpEmail, sendContributionReminder, sendLoanApprovalEmail } from "./email";
 import { z } from "zod";
 import { insertContributionSchema, insertLoanSchema, insertMemberSchema } from "@shared/schema";
+import express from "express";
+import { generateCSV, generateExcel, getFilename } from "./utils";
+import { sendEmail } from "./email";
+import { requireAuth } from "./auth";
 
 // Validation schemas
 const loginSchema = z.object({
@@ -361,6 +365,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error sending reminders:", error);
       res.status(500).json({ message: "Failed to send reminders" });
+    }
+  });
+
+  // Reports routes
+  app.post("/api/reports/export", requireAuth, async (req, res) => {
+    try {
+      const { format, filters } = req.body;
+      const data = await storage.getFilteredReportData(filters);
+      
+      let content: string | Buffer;
+      let contentType: string;
+      
+      if (format === 'csv') {
+        content = generateCSV(data);
+        contentType = 'text/csv';
+      } else if (format === 'excel') {
+        content = generateExcel(data);
+        contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      } else {
+        throw new Error('Invalid format');
+      }
+
+      const filename = getFilename(format, filters);
+      
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Type', contentType);
+      res.send(content);
+    } catch (error) {
+      console.error('Export report error:', error);
+      res.status(500).json({ error: 'Failed to export report' });
+    }
+  });
+
+  app.post("/api/reports/email", requireAuth, async (req, res) => {
+    try {
+      const { format, filters, email } = req.body;
+      
+      // Validate email
+      if (!email || typeof email !== 'string' || !email.includes('@')) {
+        throw new Error('Invalid email address');
+      }
+
+      console.log('Preparing to send report to:', email);
+      const data = await storage.getFilteredReportData(filters);
+      
+      let content: string | Buffer;
+      let filename: string;
+      let contentType: string;
+      
+      if (format === 'csv') {
+        content = generateCSV(data);
+        contentType = 'text/csv';
+      } else if (format === 'excel') {
+        content = generateExcel(data);
+        contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      } else {
+        throw new Error('Invalid format');
+      }
+
+      filename = getFilename(format, filters);
+      console.log('Generated report:', filename);
+
+      const emailOptions = {
+        to: email,
+        subject: `Report: ${filename}`,
+        text: `Please find attached the report: ${filename}`,
+        attachments: [{
+          filename,
+          content,
+          contentType
+        }]
+      };
+
+      console.log('Sending email with options:', {
+        to: emailOptions.to,
+        subject: emailOptions.subject,
+        attachment: emailOptions.attachments[0].filename
+      });
+
+      const emailResult = await sendEmail(emailOptions);
+
+      if (!emailResult) {
+        throw new Error('Failed to send email');
+      }
+
+      res.json({ message: 'Report sent successfully' });
+    } catch (error) {
+      console.error('Email report error:', error);
+      res.status(500).json({ 
+        error: 'Failed to send report via email',
+        details: error.message 
+      });
     }
   });
 

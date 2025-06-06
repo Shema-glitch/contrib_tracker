@@ -38,6 +38,10 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">FundSync Dashboard</h1>
+        <p className="text-muted-foreground">Empowering Contributions, Securing Loans, Building Futures.</p>
+      </div>
       {/* Stats Cards */}
       <StatsCards stats={stats} isLoading={statsLoading} />
 

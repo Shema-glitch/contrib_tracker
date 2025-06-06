@@ -175,186 +175,186 @@ export default function LoginPage() {
           className="w-full max-w-md"
         >
           <Card className="w-full">
-            <CardHeader className="text-center">
+          <CardHeader className="text-center">
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.2 }}
                 className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4"
               >
-                <Coins className="text-2xl text-primary-foreground" />
+              <Coins className="text-2xl text-primary-foreground" />
               </motion.div>
-              <CardTitle className="text-xl sm:text-2xl">Member Contribution Manager</CardTitle>
-              <CardDescription className="text-sm sm:text-base">
-                {step === "email" 
+            <CardTitle className="text-xl sm:text-2xl">Member Contribution Manager</CardTitle>
+            <CardDescription className="text-sm sm:text-base">
+              {step === "email" 
                   ? "Welcome back! Please enter your email to continue" 
-                  : step === "password"
-                  ? "Enter your password to proceed"
+                : step === "password"
+                ? "Enter your password to proceed"
                   : "Enter the 6-digit code sent to your email"
-                }
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {step === "email" && (
-                <>
-                  <div className="space-y-2">
+              }
+            </CardDescription>
+          </CardHeader>
+        <CardContent className="space-y-4">
+        {step === "email" && (
+            <>
+              <div className="space-y-2">
                     <Label htmlFor="email">Email Address</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                      <Input
-                        id="email"
-                        type="email"
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    id="email"
+                    type="email"
                         placeholder="Enter your email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                         className="pl-10 h-11"
                         autoFocus
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Login Method</Label>
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Login Method</Label>
                     <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        type="button"
-                        variant={loginMethod === "password" ? "default" : "outline"}
-                        onClick={() => setLoginMethod("password")}
+                  <Button
+                    type="button"
+                    variant={loginMethod === "password" ? "default" : "outline"}
+                    onClick={() => setLoginMethod("password")}
                         className="h-11"
-                      >
+                  >
                         <Key className="mr-2 h-4 w-4" />
                         Password
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={loginMethod === "otp" ? "default" : "outline"}
-                        onClick={() => setLoginMethod("otp")}
-                        className="h-11"
-                      >
-                        <Send className="mr-2 h-4 w-4" />
-                        OTP
-                      </Button>
-                    </div>
-                  </div>
-
-                  <Button 
-                    onClick={handleEmailSubmit} 
-                    disabled={isLoading || !email}
-                    className="w-full h-11"
-                  >
-                    {loginMethod === "password" ? (
-                      <>
-                        <Key className="mr-2 h-4 w-4" />
-                        {isLoading ? "Processing..." : "Continue with Password"}
-                      </>
-                    ) : (
-                      <>
-                        <Send className="mr-2 h-4 w-4" />
-                        {isLoading ? "Sending..." : "Send OTP"}
-                      </>
-                    )}
-                  </Button>
-                </>
-              )}
-
-              {step === "password" && (
-                <>
-                  <div className="text-center mb-4">
-                    <p className="text-sm text-muted-foreground">
-                      Enter your password for: <strong>{email}</strong>
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                      <Input
-                        id="password"
-                        type="password"
-                        placeholder="Enter your password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="pl-10 h-11"
-                        autoFocus
-                        onKeyPress={(e) => e.key === "Enter" && handleTraditionalLogin()}
-                      />
-                    </div>
-                  </div>
-                  <Button 
-                    onClick={handleTraditionalLogin} 
-                    disabled={isLoading || !password}
-                    className="w-full h-11"
-                  >
-                    <Key className="mr-2 h-4 w-4" />
-                    {isLoading ? "Verifying..." : "Login & Send OTP"}
                   </Button>
                   <Button
-                    variant="ghost"
-                    onClick={() => setStep("email")}
-                    className="w-full h-11"
+                    type="button"
+                    variant={loginMethod === "otp" ? "default" : "outline"}
+                    onClick={() => setLoginMethod("otp")}
+                        className="h-11"
                   >
-                    <Mail className="mr-2 h-4 w-4" />
-                    Back to Email
+                        <Send className="mr-2 h-4 w-4" />
+                        OTP
                   </Button>
-                </>
-              )}
+                </div>
+              </div>
 
-              {step === "otp" && (
-                <>
-                  <div className="text-center mb-4">
-                    <p className="text-sm text-muted-foreground">
-                      Enter the 6-digit code sent to: <strong>{email}</strong>
-                    </p>
-                  </div>
-                  <div className="flex justify-center">
-                    <InputOTP
-                      maxLength={6}
-                      value={otp}
-                      onChange={setOtp}
-                      className="w-full"
+              <Button 
+                onClick={handleEmailSubmit} 
+                disabled={isLoading || !email}
+                    className="w-full h-11"
+              >
+                {loginMethod === "password" ? (
+                  <>
+                    <Key className="mr-2 h-4 w-4" />
+                    {isLoading ? "Processing..." : "Continue with Password"}
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2 h-4 w-4" />
+                    {isLoading ? "Sending..." : "Send OTP"}
+                  </>
+                )}
+              </Button>
+            </>
+          )}
+
+          {step === "password" && (
+            <>
+              <div className="text-center mb-4">
+                <p className="text-sm text-muted-foreground">
+                  Enter your password for: <strong>{email}</strong>
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                        className="pl-10 h-11"
+                        autoFocus
+                    onKeyPress={(e) => e.key === "Enter" && handleTraditionalLogin()}
+                  />
+                </div>
+              </div>
+              <Button 
+                onClick={handleTraditionalLogin} 
+                disabled={isLoading || !password}
+                    className="w-full h-11"
+              >
+                <Key className="mr-2 h-4 w-4" />
+                {isLoading ? "Verifying..." : "Login & Send OTP"}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setStep("email")}
+                    className="w-full h-11"
+              >
+                    <Mail className="mr-2 h-4 w-4" />
+                Back to Email
+              </Button>
+            </>
+          )}
+
+          {step === "otp" && (
+            <>
+              <div className="text-center mb-4">
+                <p className="text-sm text-muted-foreground">
+                  Enter the 6-digit code sent to: <strong>{email}</strong>
+                </p>
+              </div>
+              <div className="flex justify-center">
+                <InputOTP
+                  maxLength={6}
+                  value={otp}
+                  onChange={setOtp}
+                  className="w-full"
                       autoFocus
-                    >
-                      <InputOTPGroup className="gap-1 sm:gap-2">
+                >
+                  <InputOTPGroup className="gap-1 sm:gap-2">
                         <InputOTPSlot index={0} className="w-10 h-10 text-base" />
                         <InputOTPSlot index={1} className="w-10 h-10 text-base" />
                         <InputOTPSlot index={2} className="w-10 h-10 text-base" />
                         <InputOTPSlot index={3} className="w-10 h-10 text-base" />
                         <InputOTPSlot index={4} className="w-10 h-10 text-base" />
                         <InputOTPSlot index={5} className="w-10 h-10 text-base" />
-                      </InputOTPGroup>
-                    </InputOTP>
-                  </div>
-                  <Button 
-                    onClick={handleVerifyOtp} 
-                    disabled={isLoading || otp.length !== 6}
+                  </InputOTPGroup>
+                </InputOTP>
+              </div>
+              <Button 
+                onClick={handleVerifyOtp} 
+                disabled={isLoading || otp.length !== 6}
                     className="w-full h-11"
-                  >
-                    <Shield className="mr-2 h-4 w-4" />
-                    {isLoading ? "Verifying..." : "Verify & Complete Login"}
-                  </Button>
+              >
+                <Shield className="mr-2 h-4 w-4" />
+                {isLoading ? "Verifying..." : "Verify & Complete Login"}
+              </Button>
                   <div className="grid grid-cols-2 gap-2">
-                    <Button 
-                      variant="ghost" 
-                      onClick={handleResendOtp}
-                      disabled={isLoading}
+                <Button 
+                  variant="ghost" 
+                  onClick={handleResendOtp}
+                  disabled={isLoading}
                       className="h-11"
-                    >
+                >
                       <Send className="mr-2 h-4 w-4" />
-                      Resend OTP
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setStep("email")}
-                      disabled={isLoading}
+                  Resend OTP
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setStep("email")}
+                  disabled={isLoading}
                       className="h-11"
-                    >
+                >
                       <Mail className="mr-2 h-4 w-4" />
-                      Back to Email
-                    </Button>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+                  Back to Email
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+        </Card>
         </motion.div>
       </div>
 
@@ -435,11 +435,11 @@ function FeatureCard({ icon, title, description }: { icon: React.ReactNode; titl
         <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50">
           {icon}
         </div>
-        <div>
-          <h3 className="font-semibold text-slate-800 dark:text-slate-200">{title}</h3>
-          <p className="text-sm text-slate-600 dark:text-slate-400">{description}</p>
-        </div>
+      <div>
+        <h3 className="font-semibold text-slate-800 dark:text-slate-200">{title}</h3>
+        <p className="text-sm text-slate-600 dark:text-slate-400">{description}</p>
       </div>
+    </div>
     </motion.div>
   );
 }

@@ -161,22 +161,25 @@ export class Storage {
 
   // Loan methods
   async getLoans() {
-    return await db
-      .select({
-        id: loans.id,
-        memberId: loans.memberId,
-        amount: loans.amount,
-        issueDate: loans.issueDate,
-        dueDate: loans.dueDate,
-        status: loans.status,
-        notes: loans.notes,
-        createdAt: loans.createdAt,
-        memberName: members.name,
-        memberEmail: members.email,
-      })
-      .from(loans)
-      .leftJoin(members, eq(loans.memberId, members.id))
-      .orderBy(desc(loans.createdAt));
+    const loans = await db.query.loans.findMany({
+      with: {
+        member: true
+      },
+      columns: {
+        id: true,
+        memberId: true,
+        amount: true,
+        issueDate: true,
+        dueDate: true,
+        repaidAmount: true,
+        isRepaid: true,
+        penalty: true,
+        notes: true,
+        createdAt: true
+      }
+    });
+
+    return loans;
   }
 
   async createLoan(data: InsertLoan) {
@@ -227,22 +230,40 @@ export class Storage {
 
   // Dashboard stats
   async getDashboardStats() {
+    // const totalMembers = await db
+    //   .select({ count: sql<number>`count(*)` })
+    //   .from(members);
+
+    // const totalContributions = await db
+    //   .select({ sum: sql<string>`sum(amount)` })
+    //   .from(contributions)
+    //   .where(eq(contributions.isPaid, true));
+
+    // const activeLoans = await db
+    //   .select({ count: sql<number>`count(*)` })
+    //   .from(loans)
+    //   .where(eq(loans.status, "active"));
+
+    // const totalPenalties = await db
+    //   .select({ sum: sql<string>`sum(amount)` })
+    //   .from(penalties)
+    //   .where(eq(penalties.isWaived, false));
     const totalMembers = await db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: sql<number>`COUNT(*) AS total` })
       .from(members);
 
     const totalContributions = await db
-      .select({ sum: sql<string>`coalesce(sum(cast(amount as decimal)), 0)` })
+      .select({ sum: sql<number>`SUM(amount) AS total` })
       .from(contributions)
       .where(eq(contributions.isPaid, true));
 
     const activeLoans = await db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: sql<number>`COUNT(*) AS total` })
       .from(loans)
       .where(eq(loans.status, "active"));
 
     const totalPenalties = await db
-      .select({ sum: sql<string>`coalesce(sum(cast(amount as decimal)), 0)` })
+      .select({ sum: sql<number>`SUM(amount) AS total` })
       .from(penalties)
       .where(eq(penalties.isWaived, false));
 
@@ -256,7 +277,7 @@ export class Storage {
 
   // Recent activity
   async getRecentActivity() {
-    const contributions = await db
+    const recentContributions = await db
       .select({
         type: sql<string>`'contribution'`,
         date: contributions.paymentDate,
@@ -271,7 +292,7 @@ export class Storage {
       .orderBy(desc(contributions.paymentDate))
       .limit(5);
 
-    const loans = await db
+    const recentLoans = await db
       .select({
         type: sql<string>`'loan'`,
         date: loans.issueDate,
@@ -286,11 +307,76 @@ export class Storage {
       .limit(5);
 
     // Combine and sort recent activities
-    const activities = [...contributions, ...loans]
+    const activities = [...recentContributions, ...recentLoans]
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 10);
 
     return activities;
+  }
+
+  // Report methods
+  async getFilteredReportData(filters: any) {
+    let data: any[] = [];
+
+    // Get all data
+    const contributions = await this.getContributions();
+    const loans = await this.getLoans();
+    const penalties = await this.getPenalties();
+
+    // Combine and format data
+    const contributionRecords = contributions.map(c => ({
+      type: 'contribution',
+      date: c.paymentDate || c.createdAt,
+      memberName: c.memberName,
+      memberEmail: c.memberEmail,
+      amount: c.amount,
+      status: c.isPaid ? 'paid' : 'unpaid',
+      notes: c.lateFee ? `Late fee: ${c.lateFee}` : ''
+    }));
+
+    const loanRecords = loans.map(l => ({
+      type: 'loan',
+      date: l.issueDate,
+      memberName: l.member?.name,
+      memberEmail: l.member?.email,
+      amount: l.amount,
+      status: l.isRepaid ? 'repaid' : 'active',
+      notes: l.notes
+    }));
+
+    const penaltyRecords = penalties.map(p => ({
+      type: 'penalty',
+      date: p.appliedDate,
+      memberName: p.memberName,
+      memberEmail: p.memberEmail,
+      amount: p.amount,
+      status: p.isPaid ? 'paid' : p.isWaived ? 'waived' : 'outstanding',
+      notes: p.reason
+    }));
+
+    data = [...contributionRecords, ...loanRecords, ...penaltyRecords];
+
+    // Apply filters
+    if (filters.member !== "all") {
+      data = data.filter(item => item.memberId === parseInt(filters.member));
+    }
+
+    if (filters.month !== "all") {
+      data = data.filter(item => {
+        const itemDate = new Date(item.date);
+        return itemDate.toISOString().slice(0, 7) === filters.month;
+      });
+    }
+
+    if (filters.type !== "all") {
+      data = data.filter(item => item.type === filters.type);
+    }
+
+    if (filters.status !== "all") {
+      data = data.filter(item => item.status === filters.status);
+    }
+
+    return data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }
 }
 

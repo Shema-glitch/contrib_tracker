@@ -35,6 +35,7 @@ export default function Reports() {
   const [reportMonth, setReportMonth] = useState("all");
   const [reportType, setReportType] = useState("all");
   const [reportStatus, setReportStatus] = useState("all");
+  const [emailAddress, setEmailAddress] = useState("");
   const { toast } = useToast();
 
   const { data: members } = useQuery({
@@ -55,7 +56,7 @@ export default function Reports() {
 
   const exportMutation = useMutation({
     mutationFn: async (format: string) => {
-      return apiRequest("POST", "/api/reports/export", {
+      const response = await apiRequest("POST", "/api/reports/export", {
         format,
         filters: {
           member: reportMember,
@@ -64,6 +65,27 @@ export default function Reports() {
           status: reportStatus,
         }
       });
+      
+      // Get the filename from the Content-Disposition header
+      const contentDisposition = response.headers.get("Content-Disposition");
+      const filename = contentDisposition
+        ? contentDisposition.split("filename=")[1].replace(/"/g, "")
+        : `report-${new Date().toISOString().split('T')[0]}.${format}`;
+      
+      // Create a blob from the response
+      const blob = await response.blob();
+      
+      // Create a download link and trigger the download
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      return response;
     },
     onSuccess: () => {
       toast({
@@ -82,7 +104,12 @@ export default function Reports() {
 
   const sendEmailMutation = useMutation({
     mutationFn: async () => {
+      if (!emailAddress || !emailAddress.includes('@')) {
+        throw new Error('Please enter a valid email address');
+      }
       return apiRequest("POST", "/api/reports/email", {
+        format: 'excel', // Default to Excel format for email
+        email: emailAddress,
         filters: {
           member: reportMember,
           month: reportMonth,
@@ -96,6 +123,7 @@ export default function Reports() {
         title: "Success",
         description: "Report sent via email successfully",
       });
+      setEmailAddress(""); // Clear email after successful send
     },
     onError: (error: any) => {
       toast({
@@ -188,7 +216,7 @@ export default function Reports() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Reports & Analytics</h1>
+        <h1 className="text-2xl font-bold">FundSync Reports</h1>
         <p className="text-muted-foreground">Generate comprehensive reports and export data</p>
       </div>
 
@@ -291,14 +319,6 @@ export default function Reports() {
         <CardContent>
           <div className="flex flex-wrap gap-3">
             <Button 
-              onClick={() => handleExport("pdf")} 
-              disabled={exportMutation.isPending}
-              className="enterprise-success"
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              Export as PDF
-            </Button>
-            <Button 
               onClick={() => handleExport("csv")} 
               disabled={exportMutation.isPending}
               variant="outline"
@@ -316,14 +336,23 @@ export default function Reports() {
               <Download className="h-4 w-4 mr-2" />
               Export as Excel
             </Button>
-            <Button 
-              onClick={handleEmailReport} 
-              disabled={sendEmailMutation.isPending}
-              variant="secondary"
-            >
-              <Mail className="h-4 w-4 mr-2" />
-              Email Report
-            </Button>
+            <div className="flex gap-2 items-center">
+              <input
+                type="email"
+                value={emailAddress}
+                onChange={(e) => setEmailAddress(e.target.value)}
+                placeholder="Enter email address"
+                className="px-3 py-2 border rounded-md text-sm"
+              />
+              <Button 
+                onClick={handleEmailReport} 
+                disabled={sendEmailMutation.isPending || !emailAddress}
+                variant="secondary"
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                Email Report
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
