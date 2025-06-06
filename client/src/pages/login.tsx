@@ -13,7 +13,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
-  const [step, setStep] = useState<"credentials" | "otp">("credentials");
+  const [step, setStep] = useState<"email" | "password" | "otp">("email");
   const [loginMethod, setLoginMethod] = useState<"password" | "otp">("password");
   const [isLoading, setIsLoading] = useState(false);
   const { login, isAuthenticated } = useAuth();
@@ -159,8 +159,10 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-2xl">Member Contribution Manager</CardTitle>
           <CardDescription>
-            {step === "credentials" 
-              ? "Secure admin access with email and password" 
+            {step === "email" 
+              ? "Enter your admin email to continue" 
+              : step === "password"
+              ? "Enter your password to proceed"
               : "Enter the OTP code sent to your email"
             }
           </CardDescription>
