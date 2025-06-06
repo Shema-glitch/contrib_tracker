@@ -21,11 +21,21 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
     // Check if user is authenticated on mount
     const checkAuth = async () => {
       try {
-        // Try to fetch dashboard stats to verify authentication
-        await apiRequest("GET", "/api/dashboard/stats");
-        setIsAuthenticated(true);
+        // Check localStorage for previous auth state
+        const wasAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+        
+        if (wasAuthenticated) {
+          // Try to fetch dashboard stats to verify authentication is still valid
+          await apiRequest("GET", "/api/dashboard/stats");
+          setIsAuthenticated(true);
+          localStorage.setItem('isAuthenticated', 'true');
+        } else {
+          setIsAuthenticated(false);
+          localStorage.removeItem('isAuthenticated');
+        }
       } catch (error) {
         setIsAuthenticated(false);
+        localStorage.removeItem('isAuthenticated');
       } finally {
         setIsLoading(false);
       }
@@ -48,10 +58,12 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
     try {
       await apiRequest("POST", "/api/auth/verify-otp", { email, token });
       setIsAuthenticated(true);
+      localStorage.setItem('isAuthenticated', 'true');
       setLocation("/dashboard");
       return true;
     } catch (error) {
       console.error("Login failed:", error);
+      localStorage.removeItem('isAuthenticated');
       return false;
     }
   };
@@ -63,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
       console.error("Logout error:", error);
     } finally {
       setIsAuthenticated(false);
+      localStorage.removeItem('isAuthenticated');
       setLocation("/login");
     }
   };

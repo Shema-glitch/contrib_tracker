@@ -151,22 +151,24 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-slate-900 dark:to-slate-800 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-            <Coins className="text-2xl text-primary-foreground" />
-          </div>
-          <CardTitle className="text-2xl">Member Contribution Manager</CardTitle>
-          <CardDescription>
-            {step === "email" 
-              ? "Enter your admin email to continue" 
-              : step === "password"
-              ? "Enter your password to proceed"
-              : "Enter the OTP code sent to your email"
-            }
-          </CardDescription>
-        </CardHeader>
+    <div className="min-h-screen flex bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-slate-900 dark:to-slate-800">
+      {/* Left Side - Login Form */}
+      <div className="flex-1 flex items-center justify-center p-4 lg:p-8">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
+              <Coins className="text-2xl text-primary-foreground" />
+            </div>
+            <CardTitle className="text-xl sm:text-2xl">Member Contribution Manager</CardTitle>
+            <CardDescription className="text-sm sm:text-base">
+              {step === "email" 
+                ? "Enter your admin email to continue" 
+                : step === "password"
+                ? "Enter your password to proceed"
+                : "Enter the OTP code sent to your email"
+              }
+            </CardDescription>
+          </CardHeader>
         <CardContent className="space-y-4">
         {step === "email" && (
             <>
@@ -186,23 +188,23 @@ export default function LoginPage() {
               </div>
               <div className="space-y-2">
                 <Label>Login Method</Label>
-                <div className="flex space-x-4">
+                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
                   <Button
                     type="button"
                     variant={loginMethod === "password" ? "default" : "outline"}
                     onClick={() => setLoginMethod("password")}
-                    className="flex-1"
+                    className="flex-1 text-xs sm:text-sm"
                   >
-                    <Key className="mr-2 h-4 w-4" />
+                    <Key className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                     Password + OTP
                   </Button>
                   <Button
                     type="button"
                     variant={loginMethod === "otp" ? "default" : "outline"}
                     onClick={() => setLoginMethod("otp")}
-                    className="flex-1"
+                    className="flex-1 text-xs sm:text-sm"
                   >
-                    <Send className="mr-2 h-4 w-4" />
+                    <Send className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                     OTP Only
                   </Button>
                 </div>
@@ -280,14 +282,15 @@ export default function LoginPage() {
                   maxLength={6}
                   value={otp}
                   onChange={setOtp}
+                  className="w-full"
                 >
-                  <InputOTPGroup>
-                    <InputOTPSlot index={0} />
-                    <InputOTPSlot index={1} />
-                    <InputOTPSlot index={2} />
-                    <InputOTPSlot index={3} />
-                    <InputOTPSlot index={4} />
-                    <InputOTPSlot index={5} />
+                  <InputOTPGroup className="gap-1 sm:gap-2">
+                    <InputOTPSlot index={0} className="w-8 h-8 sm:w-10 sm:h-10 text-sm sm:text-base" />
+                    <InputOTPSlot index={1} className="w-8 h-8 sm:w-10 sm:h-10 text-sm sm:text-base" />
+                    <InputOTPSlot index={2} className="w-8 h-8 sm:w-10 sm:h-10 text-sm sm:text-base" />
+                    <InputOTPSlot index={3} className="w-8 h-8 sm:w-10 sm:h-10 text-sm sm:text-base" />
+                    <InputOTPSlot index={4} className="w-8 h-8 sm:w-10 sm:h-10 text-sm sm:text-base" />
+                    <InputOTPSlot index={5} className="w-8 h-8 sm:w-10 sm:h-10 text-sm sm:text-base" />
                   </InputOTPGroup>
                 </InputOTP>
               </div>
@@ -299,12 +302,12 @@ export default function LoginPage() {
                 <Shield className="mr-2 h-4 w-4" />
                 {isLoading ? "Verifying..." : "Verify & Complete Login"}
               </Button>
-              <div className="flex space-x-2">
+              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                 <Button 
                   variant="ghost" 
                   onClick={handleResendOtp}
                   disabled={isLoading}
-                  className="flex-1"
+                  className="flex-1 text-sm"
                 >
                   Resend OTP
                 </Button>
@@ -312,7 +315,7 @@ export default function LoginPage() {
                   variant="outline" 
                   onClick={() => setStep("email")}
                   disabled={isLoading}
-                  className="flex-1"
+                  className="flex-1 text-sm"
                 >
                   Back to Email
                 </Button>
@@ -320,7 +323,71 @@ export default function LoginPage() {
             </>
           )}
         </CardContent>
-      </Card>
+        </Card>
+      </div>
+
+      {/* Right Side - Features Showcase (Hidden on mobile) */}
+      <div className="hidden lg:flex lg:flex-1 lg:items-center lg:justify-center bg-primary/5 dark:bg-primary/10 p-8">
+        <div className="max-w-md space-y-8">
+          <div className="text-center space-y-4">
+            <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-200">
+              Streamline Your
+            </h2>
+            <div className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              Financial Management
+            </div>
+          </div>
+          
+          <div className="space-y-6">
+            <FeatureCard 
+              icon="👥"
+              title="Member Management"
+              description="Track member information, status, and contribution history with ease"
+            />
+            <FeatureCard 
+              icon="💰"
+              title="Smart Contributions"
+              description="Automated tracking, penalties, and payment reminders"
+            />
+            <FeatureCard 
+              icon="📊"
+              title="Detailed Reports"
+              description="Generate comprehensive financial reports and analytics"
+            />
+            <FeatureCard 
+              icon="🔒"
+              title="Secure Access"
+              description="Multi-factor authentication with OTP verification"
+            />
+          </div>
+
+          <div className="text-center">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Trusted by organizations worldwide
+            </p>
+            <div className="flex items-center justify-center space-x-4 mt-4">
+              <div className="flex -space-x-2">
+                {[1,2,3,4].map(i => (
+                  <div key={i} className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 border-2 border-white dark:border-slate-800"></div>
+                ))}
+              </div>
+              <span className="text-xs text-slate-500">+1,000 happy users</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FeatureCard({ icon, title, description }: { icon: string; title: string; description: string }) {
+  return (
+    <div className="flex items-start space-x-4 p-4 rounded-lg bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm">
+      <div className="text-2xl">{icon}</div>
+      <div>
+        <h3 className="font-semibold text-slate-800 dark:text-slate-200">{title}</h3>
+        <p className="text-sm text-slate-600 dark:text-slate-400">{description}</p>
+      </div>
     </div>
   );
 }
