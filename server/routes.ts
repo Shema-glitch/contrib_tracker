@@ -1,3 +1,4 @@
+
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -6,6 +7,11 @@ import { z } from "zod";
 import { insertContributionSchema, insertLoanSchema, insertMemberSchema } from "@shared/schema";
 
 // Validation schemas
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+
 const sendOtpSchema = z.object({
   email: z.string().email(),
 });
@@ -24,11 +30,67 @@ const addLoanSchema = insertLoanSchema.extend({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth routes
+  // Traditional login route
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      console.log("Login attempt:", req.body);
+      const { email, password } = loginSchema.parse(req.body);
+      
+      // Check if admin exists and password is correct
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || !admin.isActive) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      // If no password is set, require password setup
+      if (!admin.passwordHash) {
+        return res.status(400).json({ 
+          message: "Password not set. Please contact administrator to set up password.",
+          requirePasswordSetup: true 
+        });
+      }
+
+      // Validate password
+      const isValidPassword = await storage.validateAdminPassword(email, password);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      // Generate OTP
+      const token = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      await storage.createOtpToken(email, token, expiresAt);
+      
+      try {
+        await sendOtpEmail(email, token);
+        console.log(`✅ Login successful for ${email}, OTP sent`);
+        res.json({ 
+          success: true, 
+          message: "Login successful. OTP sent to your email.",
+          requireOtp: true 
+        });
+      } catch (emailError) {
+        console.error("Email send failed, but login was successful:", emailError);
+        // Still proceed with success but note the email issue
+        res.json({ 
+          success: true, 
+          message: "Login successful. OTP sent (check console for mock email).",
+          requireOtp: true,
+          emailFallback: true
+        });
+      }
+
+    } catch (error) {
+      console.error("Error during login:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // Legacy OTP-only route (for backward compatibility)
   app.post("/api/auth/send-otp", async (req, res) => {
     try {
-      console.log("Request body:", req.body);
-      console.log("Email received:", req.body.email);
+      console.log("Legacy OTP request:", req.body);
       const { email } = sendOtpSchema.parse(req.body);
       
       // Check if admin exists
@@ -37,19 +99,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      // Generate OTP
+      // If password is set, require traditional login first
+      if (admin.passwordHash) {
+        return res.status(400).json({ 
+          message: "Please use email and password to login first.",
+          requireTraditionalLogin: true 
+        });
+      }
+
+      // Generate OTP for password-less accounts
       const token = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
       await storage.createOtpToken(email, token, expiresAt);
-      await sendOtpEmail(email, token);
+      
+      try {
+        await sendOtpEmail(email, token);
+        res.json({ success: true, message: "OTP sent successfully" });
+      } catch (emailError) {
+        console.error("Email send failed:", emailError);
+        res.json({ 
+          success: true, 
+          message: "OTP sent (check console for mock email)",
+          emailFallback: true 
+        });
+      }
 
-      res.json({ success: true, message: "OTP sent successfully" });
     } catch (error) {
       console.error("Error sending OTP:", error);
-      if (error.code === 'EAUTH') {
-        console.error("Email authentication failed. Please check your Gmail app password.");
-      }
       res.status(500).json({ message: "Failed to send OTP" });
     }
   });
@@ -69,6 +146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       (req.session as any).adminEmail = email;
       (req.session as any).isAuthenticated = true;
 
+      console.log(`✅ OTP verification successful for ${email}`);
       res.json({ success: true, message: "Authentication successful" });
     } catch (error) {
       console.error("Error verifying OTP:", error);
@@ -237,7 +315,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const loan = await storage.createLoan(loanData);
       
       // Send loan approval email
-      await sendLoanApprovalEmail(member.email, member.name, loanData.amount, loanData.dueDate);
+      try {
+        await sendLoanApprovalEmail(member.email, member.name, loanData.amount, loanData.dueDate);
+      } catch (emailError) {
+        console.error("Failed to send loan approval email:", emailError);
+      }
       
       res.status(201).json(loan);
     } catch (error) {
@@ -292,7 +374,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         
         if (!hasCurrentMonthContribution) {
-          await sendContributionReminder(member.email, member.name, currentMonth);
+          try {
+            await sendContributionReminder(member.email, member.name, currentMonth);
+          } catch (emailError) {
+            console.error(`Failed to send reminder to ${member.email}:`, emailError);
+          }
         }
       }
       

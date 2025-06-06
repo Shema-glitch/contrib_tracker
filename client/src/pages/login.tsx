@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
@@ -6,15 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Coins, Mail, Shield } from "lucide-react";
+import { Coins, Mail, Shield, Lock } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 export default function LoginPage() {
-  const [step, setStep] = useState<"email" | "otp">("email");
+  const [step, setStep] = useState<"credentials" | "otp">("credentials");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { sendOtp, login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -24,32 +26,52 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, setLocation]);
 
-  const handleSendOtp = async () => {
-    if (!email) {
+  const handleLogin = async () => {
+    if (!email || !password) {
       toast({
         title: "Error",
-        description: "Please enter your email address",
+        description: "Please enter both email and password",
         variant: "destructive",
       });
       return;
     }
 
     setIsLoading(true);
-    const success = await sendOtp(email);
-    setIsLoading(false);
-
-    if (success) {
-      setStep("otp");
-      toast({
-        title: "OTP Sent",
-        description: "Check your email for the verification code",
+    
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
       });
-    } else {
+
+      const result = await response.json();
+      
+      if (response.ok && result.success) {
+        if (result.requireOtp) {
+          setStep("otp");
+          toast({
+            title: "Login Successful",
+            description: result.message,
+          });
+        }
+      } else {
+        toast({
+          title: "Login Failed",
+          description: result.message || "Invalid credentials",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to send OTP. Please check your email and try again.",
+        description: "Network error. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -76,6 +98,12 @@ export default function LoginPage() {
     }
   };
 
+  const handleResendOtp = async () => {
+    setIsLoading(true);
+    await handleLogin(); // Re-trigger login to get new OTP
+    setIsLoading(false);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-slate-900 dark:to-slate-800 p-4">
       <Card className="w-full max-w-md">
@@ -84,10 +112,15 @@ export default function LoginPage() {
             <Coins className="text-2xl text-primary-foreground" />
           </div>
           <CardTitle className="text-2xl">Member Contribution Manager</CardTitle>
-          <CardDescription>Secure admin access with OTP verification</CardDescription>
+          <CardDescription>
+            {step === "credentials" 
+              ? "Secure admin access with email and password" 
+              : "Enter the OTP code sent to your email"
+            }
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {step === "email" && (
+          {step === "credentials" && (
             <>
               <div className="space-y-2">
                 <Label htmlFor="email">Admin Email</Label>
@@ -100,17 +133,31 @@ export default function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="pl-10"
-                    onKeyPress={(e) => e.key === "Enter" && handleSendOtp()}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pl-10"
+                    onKeyPress={(e) => e.key === "Enter" && handleLogin()}
                   />
                 </div>
               </div>
               <Button 
-                onClick={handleSendOtp} 
+                onClick={handleLogin} 
                 disabled={isLoading}
                 className="w-full"
               >
-                <Mail className="mr-2 h-4 w-4" />
-                {isLoading ? "Sending..." : "Send OTP Code"}
+                <Shield className="mr-2 h-4 w-4" />
+                {isLoading ? "Signing in..." : "Sign In & Send OTP"}
               </Button>
             </>
           )}
@@ -119,7 +166,7 @@ export default function LoginPage() {
             <>
               <div className="text-center mb-4">
                 <p className="text-sm text-muted-foreground">
-                  Enter the 6-digit code sent to your email
+                  Enter the 6-digit code sent to: <strong>{email}</strong>
                 </p>
               </div>
               <div className="flex justify-center">
@@ -144,16 +191,26 @@ export default function LoginPage() {
                 className="w-full"
               >
                 <Shield className="mr-2 h-4 w-4" />
-                {isLoading ? "Verifying..." : "Verify & Login"}
+                {isLoading ? "Verifying..." : "Verify & Complete Login"}
               </Button>
-              <Button 
-                variant="ghost" 
-                onClick={() => handleSendOtp()}
-                disabled={isLoading}
-                className="w-full"
-              >
-                Resend OTP Code
-              </Button>
+              <div className="flex space-x-2">
+                <Button 
+                  variant="ghost" 
+                  onClick={handleResendOtp}
+                  disabled={isLoading}
+                  className="flex-1"
+                >
+                  Resend OTP
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setStep("credentials")}
+                  disabled={isLoading}
+                  className="flex-1"
+                >
+                  Back to Login
+                </Button>
+              </div>
             </>
           )}
         </CardContent>

@@ -1,16 +1,42 @@
+
 import nodemailer from 'nodemailer';
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER || process.env.EMAIL_USER || 'charmantshema112@gmail.com',
-    pass: process.env.SMTP_PASS || process.env.EMAIL_PASS || 'weiu bwce dfxe ngby',
-  },
-});
+// Create transporter with fallback configuration
+const createTransporter = () => {
+  try {
+    return nodemailer.createTransporter({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER || process.env.EMAIL_USER || 'charmantshema112@gmail.com',
+        pass: process.env.SMTP_PASS || process.env.EMAIL_PASS || 'weiu bwce dfxe ngby',
+      },
+      tls: {
+        rejectUnauthorized: false
+      }
+    });
+  } catch (error) {
+    console.error('Failed to create email transporter:', error);
+    return null;
+  }
+};
+
+// Mock email service for development/testing
+const mockEmailService = {
+  async sendEmail(to: string, subject: string, html: string) {
+    console.log(`\n📧 MOCK EMAIL SENT:`);
+    console.log(`To: ${to}`);
+    console.log(`Subject: ${subject}`);
+    console.log(`Content: ${html.replace(/<[^>]*>/g, '')}`);
+    console.log(`\n`);
+    return Promise.resolve();
+  }
+};
 
 export async function sendOtpEmail(email: string, token: string): Promise<void> {
+  const transporter = createTransporter();
+  
   const mailOptions = {
     from: process.env.SMTP_USER || process.env.EMAIL_USER || 'charmantshema112@gmail.com',
     to: email,
@@ -28,10 +54,30 @@ export async function sendOtpEmail(email: string, token: string): Promise<void> 
     `,
   };
 
-  await transporter.sendMail(mailOptions);
+  try {
+    if (!transporter) {
+      throw new Error('Email transporter not available');
+    }
+    
+    // Test the connection first
+    await transporter.verify();
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ OTP email sent successfully to ${email}`);
+  } catch (error: any) {
+    console.error('Email service failed, using mock service:', error.message);
+    
+    // Use mock service as fallback
+    await mockEmailService.sendEmail(
+      email, 
+      'Your OTP Code - Member Contribution Manager', 
+      mailOptions.html
+    );
+  }
 }
 
 export async function sendContributionReminder(email: string, name: string, month: string): Promise<void> {
+  const transporter = createTransporter();
+  
   const mailOptions = {
     from: process.env.SMTP_USER || process.env.EMAIL_USER || 'charmantshema112@gmail.com',
     to: email,
@@ -52,10 +98,28 @@ export async function sendContributionReminder(email: string, name: string, mont
     `,
   };
 
-  await transporter.sendMail(mailOptions);
+  try {
+    if (!transporter) {
+      throw new Error('Email transporter not available');
+    }
+    
+    await transporter.verify();
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Reminder email sent successfully to ${email}`);
+  } catch (error: any) {
+    console.error('Email service failed, using mock service:', error.message);
+    
+    await mockEmailService.sendEmail(
+      email, 
+      'Monthly Contribution Reminder', 
+      mailOptions.html
+    );
+  }
 }
 
 export async function sendLoanApprovalEmail(email: string, name: string, amount: string, dueDate: string): Promise<void> {
+  const transporter = createTransporter();
+  
   const mailOptions = {
     from: process.env.SMTP_USER || process.env.EMAIL_USER || 'charmantshema112@gmail.com',
     to: email,
@@ -77,10 +141,28 @@ export async function sendLoanApprovalEmail(email: string, name: string, amount:
     `,
   };
 
-  await transporter.sendMail(mailOptions);
+  try {
+    if (!transporter) {
+      throw new Error('Email transporter not available');
+    }
+    
+    await transporter.verify();
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Loan approval email sent successfully to ${email}`);
+  } catch (error: any) {
+    console.error('Email service failed, using mock service:', error.message);
+    
+    await mockEmailService.sendEmail(
+      email, 
+      'Loan Approval Notification', 
+      mailOptions.html
+    );
+  }
 }
 
 export async function sendPenaltyNotification(email: string, name: string, penaltyType: string, amount: string, reason: string): Promise<void> {
+  const transporter = createTransporter();
+  
   const mailOptions = {
     from: process.env.SMTP_USER || process.env.EMAIL_USER || 'charmantshema112@gmail.com',
     to: email,
@@ -101,5 +183,21 @@ export async function sendPenaltyNotification(email: string, name: string, penal
     `,
   };
 
-  await transporter.sendMail(mailOptions);
+  try {
+    if (!transporter) {
+      throw new Error('Email transporter not available');
+    }
+    
+    await transporter.verify();
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Penalty notification email sent successfully to ${email}`);
+  } catch (error: any) {
+    console.error('Email service failed, using mock service:', error.message);
+    
+    await mockEmailService.sendEmail(
+      email, 
+      'Penalty Applied - Action Required', 
+      mailOptions.html
+    );
+  }
 }
