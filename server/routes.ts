@@ -180,28 +180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/dashboard/recent-activity", requireAuth, async (req, res) => {
     try {
-      const contributions = await storage.getContributions();
-      const loans = await storage.getLoans();
-
-      // Combine and sort recent activities
-      const activities = [
-        ...contributions.slice(0, 5).map(c => ({
-          type: 'contribution',
-          date: c.paymentDate || c.createdAt,
-          description: `Contribution payment`,
-          amount: c.amount,
-          memberId: c.memberId,
-        })),
-        ...loans.slice(0, 5).map(l => ({
-          type: 'loan',
-          date: l.issueDate,
-          description: `Loan issued`,
-          amount: l.amount,
-          memberId: l.memberId,
-        }))
-      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-       .slice(0, 10);
-
+      const activities = await storage.getRecentActivity();
       res.json(activities);
     } catch (error) {
       console.error("Error fetching recent activity:", error);

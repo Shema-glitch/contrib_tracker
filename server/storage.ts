@@ -193,7 +193,8 @@ export class Storage {
         type: penalties.type,
         amount: penalties.amount,
         reason: penalties.reason,
-        dateApplied: penalties.dateApplied,
+        appliedDate: penalties.appliedDate,
+        isPaid: penalties.isPaid,
         isWaived: penalties.isWaived,
         createdAt: penalties.createdAt,
         memberName: members.name,
@@ -231,7 +232,7 @@ export class Storage {
       .from(members);
 
     const totalContributions = await db
-      .select({ sum: sql<string>`sum(cast(amount as decimal))` })
+      .select({ sum: sql<string>`coalesce(sum(cast(amount as decimal)), 0)` })
       .from(contributions)
       .where(eq(contributions.isPaid, true));
 
@@ -241,7 +242,7 @@ export class Storage {
       .where(eq(loans.status, "active"));
 
     const totalPenalties = await db
-      .select({ sum: sql<string>`sum(cast(amount as decimal))` })
+      .select({ sum: sql<string>`coalesce(sum(cast(amount as decimal)), 0)` })
       .from(penalties)
       .where(eq(penalties.isWaived, false));
 
@@ -251,6 +252,45 @@ export class Storage {
       activeLoans: activeLoans[0]?.count || 0,
       totalPenalties: parseFloat(totalPenalties[0]?.sum || "0"),
     };
+  }
+
+  // Recent activity
+  async getRecentActivity() {
+    const contributions = await db
+      .select({
+        type: sql<string>`'contribution'`,
+        date: contributions.paymentDate,
+        description: sql<string>`'Contribution payment'`,
+        amount: contributions.amount,
+        memberId: contributions.memberId,
+        memberName: members.name,
+      })
+      .from(contributions)
+      .leftJoin(members, eq(contributions.memberId, members.id))
+      .where(eq(contributions.isPaid, true))
+      .orderBy(desc(contributions.paymentDate))
+      .limit(5);
+
+    const loans = await db
+      .select({
+        type: sql<string>`'loan'`,
+        date: loans.issueDate,
+        description: sql<string>`'Loan issued'`,
+        amount: loans.amount,
+        memberId: loans.memberId,
+        memberName: members.name,
+      })
+      .from(loans)
+      .leftJoin(members, eq(loans.memberId, members.id))
+      .orderBy(desc(loans.issueDate))
+      .limit(5);
+
+    // Combine and sort recent activities
+    const activities = [...contributions, ...loans]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 10);
+
+    return activities;
   }
 }
 

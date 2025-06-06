@@ -32,12 +32,12 @@ export default function ProtectedRoute({ component: Component }: ProtectedRouteP
   }
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-background">
+    <div className="flex h-screen w-full bg-slate-50 dark:bg-background overflow-hidden">
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 w-full">
         <Header />
         <main className="flex-1 overflow-y-auto p-2 sm:p-4 lg:p-6">
-          <div className="max-w-7xl mx-auto">
+          <div className="max-w-7xl mx-auto w-full">
             <Component />
           </div>
         </main>

@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { Bell, Plus, DollarSign } from "lucide-react";
+import { Bell, Plus, DollarSign, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/lib/theme";
 import { useAuth } from "@/hooks/use-auth";
@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import PaymentModal from "@/components/modals/payment-modal";
 import LoanModal from "@/components/modals/loan-modal";
+import { motion, AnimatePresence } from "framer-motion";
 
 const breadcrumbMap: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -35,8 +36,12 @@ export default function Header() {
 
   return (
     <>
-      <header className="bg-white dark:bg-card shadow-sm border-b border-border">
-        <div className="flex items-center justify-between px-6 py-4">
+      <motion.header
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="bg-white dark:bg-card shadow-sm border-b border-border"
+      >
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4">
           {/* Breadcrumbs */}
           <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
             <span>Home</span>
@@ -45,7 +50,7 @@ export default function Header() {
           </nav>
 
           {/* Header Actions */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             {/* Notifications */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -60,36 +65,70 @@ export default function Header() {
                 <div className="p-4">
                   <h3 className="font-semibold mb-3">Notifications</h3>
                   <div className="space-y-2">
-                    <div className="p-2 rounded-lg bg-warning/10 border border-warning/20">
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="p-2 rounded-lg bg-warning/10 border border-warning/20"
+                    >
                       <p className="text-sm font-medium">5 members have overdue contributions</p>
                       <p className="text-xs text-muted-foreground">2 hours ago</p>
-                    </div>
-                    <div className="p-2 rounded-lg bg-destructive/10 border border-destructive/20">
+                    </motion.div>
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 }}
+                      className="p-2 rounded-lg bg-destructive/10 border border-destructive/20"
+                    >
                       <p className="text-sm font-medium">2 loans are past due</p>
                       <p className="text-xs text-muted-foreground">1 day ago</p>
-                    </div>
+                    </motion.div>
                   </div>
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
 
             {/* Quick Actions */}
-            <Button onClick={() => setShowPaymentModal(true)} className="hidden sm:flex">
-              <Plus className="h-4 w-4 mr-2" />
-              Record Payment
-            </Button>
-            <Button onClick={() => setShowLoanModal(true)} variant="secondary" className="hidden sm:flex">
-              <DollarSign className="h-4 w-4 mr-2" />
-              Add Loan
-            </Button>
+            <div className="hidden sm:flex space-x-2">
+              <Button onClick={() => setShowPaymentModal(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Record Payment
+              </Button>
+              <Button onClick={() => setShowLoanModal(true)} variant="secondary">
+                <DollarSign className="h-4 w-4 mr-2" />
+                Add Loan
+              </Button>
+            </div>
+
+            {/* Mobile Quick Actions */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="sm:hidden">
+                  <Plus className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setShowPaymentModal(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Record Payment
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowLoanModal(true)}>
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Add Loan
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* User Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon">
-                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="w-8 h-8 bg-primary rounded-full flex items-center justify-center"
+                  >
                     <span className="text-primary-foreground text-sm font-medium">A</span>
-                  </div>
+                  </motion.div>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -103,10 +142,16 @@ export default function Header() {
             </DropdownMenu>
           </div>
         </div>
-      </header>
+      </motion.header>
 
-      <PaymentModal open={showPaymentModal} onOpenChange={setShowPaymentModal} />
-      <LoanModal open={showLoanModal} onOpenChange={setShowLoanModal} />
+      <AnimatePresence>
+        {showPaymentModal && (
+          <PaymentModal open={showPaymentModal} onOpenChange={setShowPaymentModal} />
+        )}
+        {showLoanModal && (
+          <LoanModal open={showLoanModal} onOpenChange={setShowLoanModal} />
+        )}
+      </AnimatePresence>
     </>
   );
 }
