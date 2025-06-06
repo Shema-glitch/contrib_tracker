@@ -61,8 +61,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.markOtpAsUsed(otpToken.id);
       
       // Set session
-      req.session.adminEmail = email;
-      req.session.isAuthenticated = true;
+      (req.session as any).adminEmail = email;
+      (req.session as any).isAuthenticated = true;
 
       res.json({ success: true, message: "Authentication successful" });
     } catch (error) {
@@ -82,7 +82,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Auth middleware
   const requireAuth = (req: any, res: any, next: any) => {
-    if (!req.session?.isAuthenticated) {
+    if (!(req.session as any)?.isAuthenticated) {
       return res.status(401).json({ message: "Authentication required" });
     }
     next();

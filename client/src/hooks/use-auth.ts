@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -12,7 +12,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }): React.ReactElement {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [, setLocation] = useLocation();
@@ -67,16 +67,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  return (
-    <AuthContext.Provider value={{
-      isAuthenticated,
-      login,
-      logout,
-      sendOtp,
-      isLoading,
-    }}>
-      {children}
-    </AuthContext.Provider>
+  return React.createElement(
+    AuthContext.Provider,
+    {
+      value: {
+        isAuthenticated,
+        login,
+        logout,
+        sendOtp,
+        isLoading,
+      }
+    },
+    children
   );
 }
 
