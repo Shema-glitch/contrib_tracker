@@ -308,11 +308,11 @@ export default function LoginPage() {
                 </Button>
                 <Button 
                   variant="outline" 
-                  onClick={() => setStep("credentials")}
+                  onClick={() => setStep("email")}
                   disabled={isLoading}
                   className="flex-1"
                 >
-                  Back to Login
+                  Back to Email
                 </Button>
               </div>
             </>
