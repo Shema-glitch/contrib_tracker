@@ -10,7 +10,7 @@ const createTransporter = () => {
       secure: false,
       auth: {
         user: process.env.SMTP_USER || process.env.EMAIL_USER || 'charmantshema112@gmail.com',
-        pass: process.env.SMTP_PASS || process.env.EMAIL_PASS || 'weiu bwce dfxe ngby',
+        pass: process.env.SMTP_PASS || process.env.EMAIL_PASS || 'kfqb rpdm doow pajj',
       },
       tls: {
         rejectUnauthorized: false

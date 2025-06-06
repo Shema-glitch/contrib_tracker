@@ -1,4 +1,3 @@
-
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -30,54 +29,52 @@ const addLoanSchema = insertLoanSchema.extend({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Traditional login route
+  // Traditional login with email and password
   app.post("/api/auth/login", async (req, res) => {
     try {
-      console.log("Login attempt:", req.body);
-      const { email, password } = loginSchema.parse(req.body);
-      
-      // Check if admin exists and password is correct
-      const admin = await storage.getAdminByEmail(email);
-      if (!admin || !admin.isActive) {
-        return res.status(401).json({ message: "Invalid credentials" });
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
       }
 
-      // If no password is set, require password setup
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) {
+        return res.status(404).json({ message: "Admin not found" });
+      }
+
       if (!admin.passwordHash) {
         return res.status(400).json({ 
-          message: "Password not set. Please contact administrator to set up password.",
-          requirePasswordSetup: true 
+          message: "This account uses OTP-only login. Please use the 'Send OTP' option.",
+          requiresOtp: true 
         });
       }
 
-      // Validate password
       const isValidPassword = await storage.validateAdminPassword(email, password);
       if (!isValidPassword) {
-        return res.status(401).json({ message: "Invalid credentials" });
+        return res.status(401).json({ message: "Invalid password" });
       }
 
-      // Generate OTP
+      // Password validated, now send OTP for second factor
       const token = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
       await storage.createOtpToken(email, token, expiresAt);
-      
+
       try {
         await sendOtpEmail(email, token);
-        console.log(`✅ Login successful for ${email}, OTP sent`);
         res.json({ 
           success: true, 
-          message: "Login successful. OTP sent to your email.",
-          requireOtp: true 
+          message: "Password verified. OTP sent to your email for second factor authentication.",
+          requiresOtp: true
         });
       } catch (emailError) {
-        console.error("Email send failed, but login was successful:", emailError);
-        // Still proceed with success but note the email issue
+        console.error("Email send failed:", emailError);
         res.json({ 
           success: true, 
-          message: "Login successful. OTP sent (check console for mock email).",
-          requireOtp: true,
-          emailFallback: true
+          message: "Password verified. OTP sent (check console for mock email)",
+          requiresOtp: true,
+          emailFallback: true 
         });
       }
 
@@ -87,22 +84,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Legacy OTP-only route (for backward compatibility)
   app.post("/api/auth/send-otp", async (req, res) => {
     try {
-      console.log("Legacy OTP request:", req.body);
       const { email } = sendOtpSchema.parse(req.body);
-      
-      // Check if admin exists
+      console.log("Request body:", req.body);
+      console.log("Email received:", email);
+
       const admin = await storage.getAdminByEmail(email);
-      if (!admin || !admin.isActive) {
-        return res.status(401).json({ message: "Unauthorized" });
+      if (!admin) {
+        return res.status(404).json({ message: "Admin not found" });
       }
 
       // If password is set, require traditional login first
       if (admin.passwordHash) {
         return res.status(400).json({ 
-          message: "Please use email and password to login first.",
+          message: "This account requires password authentication first. Please use the login form.",
           requireTraditionalLogin: true 
         });
       }
@@ -112,7 +108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
       await storage.createOtpToken(email, token, expiresAt);
-      
+
       try {
         await sendOtpEmail(email, token);
         res.json({ success: true, message: "OTP sent successfully" });
@@ -134,14 +130,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/verify-otp", async (req, res) => {
     try {
       const { email, token } = verifyOtpSchema.parse(req.body);
-      
+
       const otpToken = await storage.getValidOtpToken(email, token);
       if (!otpToken) {
         return res.status(401).json({ message: "Invalid or expired OTP" });
       }
 
       await storage.markOtpAsUsed(otpToken.id);
-      
+
       // Set session
       (req.session as any).adminEmail = email;
       (req.session as any).isAuthenticated = true;
@@ -186,7 +182,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const contributions = await storage.getContributions();
       const loans = await storage.getLoans();
-      
+
       // Combine and sort recent activities
       const activities = [
         ...contributions.slice(0, 5).map(c => ({
@@ -264,14 +260,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const data = recordPaymentSchema.parse(req.body);
       const { applyLateFee, ...contributionData } = data;
-      
+
       // Calculate late fee if applicable
       if (applyLateFee) {
         contributionData.lateFee = "1000"; // 1,000 RWF late fee
       }
 
       const contribution = await storage.createContribution(contributionData);
-      
+
       // Update member's total contributions
       if (contribution.isPaid) {
         await storage.updateMemberContributions(contribution.memberId, contribution.amount);
@@ -298,13 +294,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/loans", requireAuth, async (req, res) => {
     try {
       const loanData = addLoanSchema.parse(req.body);
-      
+
       // Check member eligibility
       const member = await storage.getMember(loanData.memberId);
       if (!member) {
         return res.status(404).json({ message: "Member not found" });
       }
-      
+
       const totalContributions = parseFloat(member.totalContributions || "0");
       if (totalContributions < 30000) {
         return res.status(400).json({ 
@@ -313,14 +309,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const loan = await storage.createLoan(loanData);
-      
+
       // Send loan approval email
       try {
         await sendLoanApprovalEmail(member.email, member.name, loanData.amount, loanData.dueDate);
       } catch (emailError) {
         console.error("Failed to send loan approval email:", emailError);
       }
-      
+
       res.status(201).json(loan);
     } catch (error) {
       console.error("Error creating loan:", error);
@@ -366,13 +362,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const members = await storage.getMembers();
       const currentMonth = new Date().toISOString().slice(0, 7);
-      
+
       for (const member of members) {
         const contributions = await storage.getContributionsByMember(member.id);
         const hasCurrentMonthContribution = contributions.some(c => 
           c.month === currentMonth && c.isPaid
         );
-        
+
         if (!hasCurrentMonthContribution) {
           try {
             await sendContributionReminder(member.email, member.name, currentMonth);
@@ -381,7 +377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
-      
+
       res.json({ success: true, message: "Reminders sent successfully" });
     } catch (error) {
       console.error("Error sending reminders:", error);

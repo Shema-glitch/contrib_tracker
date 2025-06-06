@@ -1,4 +1,3 @@
-
 import { Pool } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
 
@@ -26,7 +25,7 @@ async function createAdmin() {
     const email = 'charmantshema112@gmail.com';
     const name = 'Admin User';
     const password = 'admin123'; // Default password - should be changed after first login
-    
+
     // Hash the password
     const passwordHash = bcrypt.hashSync(password, 10);
 

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
@@ -7,14 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Coins, Mail, Shield, Lock } from "lucide-react";
+import { Coins, Mail, Shield, Lock, Send, Key } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 export default function LoginPage() {
-  const [step, setStep] = useState<"credentials" | "otp">("credentials");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
+  const [step, setStep] = useState<"credentials" | "otp">("credentials");
+  const [loginMethod, setLoginMethod] = useState<"password" | "otp">("password");
   const [isLoading, setIsLoading] = useState(false);
   const { login, isAuthenticated } = useAuth();
   const { toast } = useToast();
@@ -26,18 +26,8 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, setLocation]);
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      toast({
-        title: "Error",
-        description: "Please enter both email and password",
-        variant: "destructive",
-      });
-      return;
-    }
-
+  const handleTraditionalLogin = async () => {
     setIsLoading(true);
-    
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
@@ -47,31 +37,87 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
 
-      const result = await response.json();
-      
-      if (response.ok && result.success) {
-        if (result.requireOtp) {
-          setStep("otp");
-          toast({
-            title: "Login Successful",
-            description: result.message,
-          });
-        }
+      const data = await response.json();
+
+      if (response.ok && data.requiresOtp) {
+        setStep("otp");
+        toast({
+          title: "Success",
+          description: data.message,
+        });
+      } else if (data.requiresOtp === false) {
+        // Direct login without OTP (shouldn't happen in this system)
+        setLocation("/dashboard");
       } else {
         toast({
-          title: "Login Failed",
-          description: result.message || "Invalid credentials",
+          title: "Error",
+          description: data.message,
           variant: "destructive",
         });
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Network error. Please try again.",
+        description: "Login failed",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleOtpLogin = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setStep("otp");
+        toast({
+          title: "Success",
+          description: data.message,
+        });
+      } else {
+        if (data.requireTraditionalLogin) {
+          setLoginMethod("password");
+          setStep("password");
+          toast({
+            title: "Password Required",
+            description: data.message,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: data.message,
+            variant: "destructive",
+          });
+        }
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send OTP",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEmailSubmit = () => {
+    if (loginMethod === "password") {
+      setStep("password");
+    } else {
+      handleOtpLogin();
     }
   };
 
@@ -100,7 +146,7 @@ export default function LoginPage() {
 
   const handleResendOtp = async () => {
     setIsLoading(true);
-    await handleLogin(); // Re-trigger login to get new OTP
+    await handleOtpLogin(); // Re-trigger login to get new OTP
     setIsLoading(false);
   };
 
@@ -120,7 +166,7 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {step === "credentials" && (
+        {step === "email" && (
             <>
               <div className="space-y-2">
                 <Label htmlFor="email">Admin Email</Label>
@@ -137,6 +183,57 @@ export default function LoginPage() {
                 </div>
               </div>
               <div className="space-y-2">
+                <Label>Login Method</Label>
+                <div className="flex space-x-4">
+                  <Button
+                    type="button"
+                    variant={loginMethod === "password" ? "default" : "outline"}
+                    onClick={() => setLoginMethod("password")}
+                    className="flex-1"
+                  >
+                    <Key className="mr-2 h-4 w-4" />
+                    Password + OTP
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={loginMethod === "otp" ? "default" : "outline"}
+                    onClick={() => setLoginMethod("otp")}
+                    className="flex-1"
+                  >
+                    <Send className="mr-2 h-4 w-4" />
+                    OTP Only
+                  </Button>
+                </div>
+              </div>
+
+              <Button 
+                onClick={handleEmailSubmit} 
+                disabled={isLoading || !email}
+                className="w-full"
+              >
+                {loginMethod === "password" ? (
+                  <>
+                    <Key className="mr-2 h-4 w-4" />
+                    {isLoading ? "Processing..." : "Continue with Password"}
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2 h-4 w-4" />
+                    {isLoading ? "Sending..." : "Send OTP"}
+                  </>
+                )}
+              </Button>
+            </>
+          )}
+
+          {step === "password" && (
+            <>
+              <div className="text-center mb-4">
+                <p className="text-sm text-muted-foreground">
+                  Enter your password for: <strong>{email}</strong>
+                </p>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -147,17 +244,24 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="pl-10"
-                    onKeyPress={(e) => e.key === "Enter" && handleLogin()}
+                    onKeyPress={(e) => e.key === "Enter" && handleTraditionalLogin()}
                   />
                 </div>
               </div>
               <Button 
-                onClick={handleLogin} 
-                disabled={isLoading}
+                onClick={handleTraditionalLogin} 
+                disabled={isLoading || !password}
                 className="w-full"
               >
-                <Shield className="mr-2 h-4 w-4" />
-                {isLoading ? "Signing in..." : "Sign In & Send OTP"}
+                <Key className="mr-2 h-4 w-4" />
+                {isLoading ? "Verifying..." : "Login & Send OTP"}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setStep("email")}
+                className="w-full"
+              >
+                Back to Email
               </Button>
             </>
           )}
