@@ -42,12 +42,15 @@ export default function Header() {
         className="bg-white dark:bg-card shadow-sm border-b border-border"
       >
         <div className="flex items-center justify-between px-4 sm:px-6 py-4">
-          {/* Breadcrumbs */}
-          <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <span>Home</span>
-            <span>/</span>
-            <span className="text-foreground font-medium">{currentPage}</span>
-          </nav>
+          {/* Left section with breadcrumbs */}
+          <div className="flex items-center">
+            {/* Breadcrumbs */}
+            <nav className="flex items-center space-x-2 text-sm text-muted-foreground ml-12 md:ml-0">
+              <span>Home</span>
+              <span>/</span>
+              <span className="text-foreground font-medium">{currentPage}</span>
+            </nav>
+          </div>
 
           {/* Header Actions */}
           <div className="flex items-center space-x-2 sm:space-x-4">

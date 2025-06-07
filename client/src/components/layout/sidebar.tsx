@@ -106,8 +106,8 @@ export default function Sidebar() {
       {/* Mobile Sidebar */}
       <Sheet>
         <SheetTrigger asChild>
-          <Button variant="ghost" size="icon" className="md:hidden fixed top-4 left-4 z-50">
-            <Menu className="h-5 w-5" />
+          <Button variant="ghost" size="icon" className="md:hidden fixed top-4 left-4 z-50 w-10 h-10">
+            <Menu className="h-5 w-5 min-w-[20px] min-h-[20px]" />
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="p-0 w-72">
