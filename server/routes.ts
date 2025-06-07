@@ -8,6 +8,7 @@ import express from "express";
 import { generateCSV, generateExcel, getFilename } from "./utils";
 import { sendEmail } from "./email";
 import { requireAuth } from "./auth";
+import notificationsRouter from "./notifications";
 
 // Validation schemas
 const loginSchema = z.object({
@@ -142,9 +143,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.markOtpAsUsed(otpToken.id);
 
+      // Get the admin user
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) {
+        return res.status(404).json({ message: "Admin not found" });
+      }
+
       // Set session
-      (req.session as any).adminEmail = email;
-      (req.session as any).isAuthenticated = true;
+      req.session.user = {
+        id: admin.id.toString(),
+        email: admin.email
+      };
+      req.session.isAuthenticated = true;
+
+      // Save session explicitly
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => {
+          if (err) {
+            console.error("Session save error:", err);
+            reject(err);
+          }
+          resolve();
+        });
+      });
 
       console.log(`✅ OTP verification successful for ${email}`);
       res.json({ success: true, message: "Authentication successful" });
@@ -164,8 +185,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Auth middleware
-  const requireAuth = (req: any, res: any, next: any) => {
-    if (!(req.session as any)?.isAuthenticated) {
+  const requireAuth = (
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) => {
+    if (!req.session?.isAuthenticated) {
       return res.status(401).json({ message: "Authentication required" });
     }
     next();
@@ -368,6 +393,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/members/:memberId/send-reminder", requireAuth, async (req, res) => {
+    try {
+      const { memberId } = req.params;
+      const member = await storage.getMember(memberId);
+      
+      if (!member) {
+        return res.status(404).json({ message: "Member not found" });
+      }
+
+      const dueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+      const dueAmount = "5,000"; // You might want to make this dynamic based on your business logic
+
+      await sendContributionReminder({
+        to: member.email,
+        name: member.name,
+        dueAmount,
+        dueDate: dueDate.toLocaleDateString()
+      });
+
+      // Create a notification
+      await storage.insertNotification({
+        userId: member.id,
+        type: "REMINDER_SENT",
+        title: "Contribution Reminder Sent",
+        message: `Reminder sent to ${member.name} for monthly contribution`,
+        data: {
+          memberId: member.id,
+          memberName: member.name,
+          dueAmount,
+          dueDate: dueDate.toISOString(),
+          reminderDate: new Date().toISOString()
+        }
+      });
+
+      res.json({ success: true, message: "Reminder sent successfully" });
+    } catch (error) {
+      console.error("Error sending reminder:", error);
+      if (error instanceof Error) {
+        res.status(500).json({ message: "Failed to send reminder", details: error.message });
+      } else {
+        res.status(500).json({ message: "Failed to send reminder" });
+      }
+    }
+  });
+
   // Reports routes
   app.post("/api/reports/export", requireAuth, async (req, res) => {
     try {
@@ -459,6 +529,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+
+  app.use("/api/notifications", requireAuth, notificationsRouter);
 
   const httpServer = createServer(app);
   return httpServer;

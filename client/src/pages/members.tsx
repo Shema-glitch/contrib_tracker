@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/use-toast";
 import {
   Table,
   TableBody,
@@ -27,13 +28,71 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Search, MoreHorizontal, Eye, CreditCard, HandHeart, Mail } from "lucide-react";
 
+interface Member {
+  id: string;
+  name: string;
+  memberId: string;
+  email: string;
+  totalContributions: string;
+  status: string;
+}
+
 export default function Members() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const { data: members, isLoading } = useQuery({
+  const { data: members, isLoading } = useQuery<Member[]>({
     queryKey: ["/api/members"],
+    queryFn: async () => {
+      const response = await fetch("/api/members", {
+        credentials: "include"
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch members");
+      }
+      return response.json();
+    }
   });
+
+  const sendReminderMutation = useMutation({
+    mutationFn: async (memberId: string) => {
+      const response = await fetch(`/api/members/${memberId}/send-reminder`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to send reminder");
+      }
+      
+      return response.json();
+    },
+    onSuccess: (_, memberId) => {
+      toast({
+        title: "Reminder Sent",
+        description: "Contribution reminder has been sent to the member.",
+      });
+      // Optionally refresh members data
+      queryClient.invalidateQueries({ queryKey: ["/api/members"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send reminder",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSendReminder = async (memberId: string) => {
+    await sendReminderMutation.mutate(memberId);
+  };
 
   const filteredMembers = members?.filter((member: any) => {
     const matchesSearch = member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -161,7 +220,7 @@ export default function Members() {
                               Add Loan
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleSendReminder(member.id)}>
                             <Mail className="mr-2 h-4 w-4" />
                             Send Reminder
                           </DropdownMenuItem>

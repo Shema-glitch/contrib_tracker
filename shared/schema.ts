@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, decimal, timestamp, varchar, date, json } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, decimal, timestamp, varchar, date, json, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -56,12 +56,15 @@ export const penalties = pgTable("penalties", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Admin users table
-export const admins = pgTable("admins", {
+// Notifications table
+export const notifications = pgTable("notifications", {
   id: serial("id").primaryKey(),
-  email: text("email").notNull().unique(),
-  name: text("name").notNull(),
-  isActive: boolean("is_active").default(true),
+  userId: integer("user_id").references(() => members.id),
+  type: varchar("type", { length: 50 }).notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  is_read: boolean("is_read").default(false),
+  data: json("data"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -71,7 +74,7 @@ export const otpTokens = pgTable("otp_tokens", {
   email: text("email").notNull(),
   token: varchar("token", { length: 6 }).notNull(),
   expiresAt: timestamp("expires_at").notNull(),
-  isUsed: boolean("is_used").default(false),
+  is_used: boolean("is_used").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -90,11 +93,28 @@ export const sessions = pgTable("sessions", {
   expire: timestamp("expire").notNull()
 });
 
+// Users table
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  isAdmin: boolean("is_admin").default(false),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  passwordHash: text("password_hash"),
+  otpHash: text("otp_hash"),
+  otpExpiresAt: timestamp("otp_expires_at"),
+});
+
+// Schema for inserting notifications
+export const insertNotificationSchema = createInsertSchema(notifications);
+
 // Relations
 export const membersRelations = relations(members, ({ many }) => ({
   contributions: many(contributions),
   loans: many(loans),
   penalties: many(penalties),
+  notifications: many(notifications),
 }));
 
 export const contributionsRelations = relations(contributions, ({ one }) => ({
@@ -114,6 +134,17 @@ export const loansRelations = relations(loans, ({ one }) => ({
 export const penaltiesRelations = relations(penalties, ({ one }) => ({
   member: one(members, {
     fields: [penalties.memberId],
+    references: [members.id],
+  }),
+}));
+
+export const userRelations = relations(users, ({ many }) => ({
+  notifications: many(notifications),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  member: one(members, {
+    fields: [notifications.userId],
     references: [members.id],
   }),
 }));
@@ -143,11 +174,6 @@ export const insertPenaltySchema = createInsertSchema(penalties).omit({
   createdAt: true,
 });
 
-export const insertAdminSchema = createInsertSchema(admins).omit({
-  id: true,
-  createdAt: true,
-});
-
 export const insertSettingsSchema = createInsertSchema(settings).omit({
   id: true,
   updatedAt: true,
@@ -162,8 +188,6 @@ export type Loan = typeof loans.$inferSelect;
 export type InsertLoan = z.infer<typeof insertLoanSchema>;
 export type Penalty = typeof penalties.$inferSelect;
 export type InsertPenalty = z.infer<typeof insertPenaltySchema>;
-export type Admin = typeof admins.$inferSelect;
-export type InsertAdmin = z.infer<typeof insertAdminSchema>;
 export type Settings = typeof settings.$inferSelect;
 export type InsertSettings = z.infer<typeof insertSettingsSchema>;
 export type OtpToken = typeof otpTokens.$inferSelect;

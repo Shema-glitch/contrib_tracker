@@ -8,7 +8,8 @@ import {
   penalties,
   settings,
   otpTokens,
-  admins,
+  users,
+  notifications,
   type InsertMember,
   type InsertContribution,
   type InsertLoan,
@@ -24,11 +25,12 @@ export class Storage {
     const passwordHash = password ? bcrypt.hashSync(password, 10) : null;
 
     const [admin] = await db
-      .insert(admins)
+      .insert(users)
       .values({
         email,
         name,
         passwordHash,
+        isAdmin: true,
       })
       .returning();
     return admin;
@@ -37,8 +39,13 @@ export class Storage {
   async getAdminByEmail(email: string) {
     const [admin] = await db
       .select()
-      .from(admins)
-      .where(eq(admins.email, email))
+      .from(users)
+      .where(
+        and(
+          eq(users.email, email),
+          eq(users.isAdmin, true)
+        )
+      )
       .limit(1);
     return admin;
   }
@@ -54,18 +61,42 @@ export class Storage {
   async updateAdminPassword(email: string, newPassword: string) {
     const passwordHash = bcrypt.hashSync(newPassword, 10);
     await db
-      .update(admins)
+      .update(users)
       .set({ passwordHash })
-      .where(eq(admins.email, email));
+      .where(
+        and(
+          eq(users.email, email),
+          eq(users.isAdmin, true)
+        )
+      );
+  }
+
+  // Member methods
+  async getMemberById(id: number) {
+    try {
+      const [member] = await db
+        .select()
+        .from(members)
+        .where(eq(members.id, id))
+        .limit(1);
+      return member;
+    } catch (error) {
+      console.error("Error getting member:", error);
+      return null;
+    }
   }
 
   // OTP methods
   async createOtpToken(email: string, token: string, expiresAt: Date) {
-    await db.insert(otpTokens).values({
-      email,
-      token,
-      expiresAt,
-    });
+    const [otpToken] = await db
+      .insert(otpTokens)
+      .values({
+        email,
+        token,
+        expiresAt,
+      })
+      .returning();
+    return otpToken;
   }
 
   async getValidOtpToken(email: string, token: string) {
@@ -76,7 +107,7 @@ export class Storage {
         and(
           eq(otpTokens.email, email),
           eq(otpTokens.token, token),
-          eq(otpTokens.isUsed, false),
+          eq(otpTokens.is_used, false),
           gte(otpTokens.expiresAt, new Date())
         )
       )
@@ -87,8 +118,31 @@ export class Storage {
   async markOtpAsUsed(id: number) {
     await db
       .update(otpTokens)
-      .set({ isUsed: true })
+      .set({ is_used: true })
       .where(eq(otpTokens.id, id));
+  }
+
+  // Notification methods
+  async insertNotification(data: {
+    userId: number;
+    type: string;
+    title: string;
+    message: string;
+    data?: Record<string, unknown>;
+  }) {
+    try {
+      const [result] = await db
+        .insert(notifications)
+        .values({
+          ...data,
+          createdAt: new Date()
+        })
+        .returning();
+      return result;
+    } catch (error) {
+      console.error("Error inserting notification:", error);
+      return null;
+    }
   }
 
   // Member methods
@@ -97,12 +151,17 @@ export class Storage {
   }
 
   async getMember(id: number) {
-    const [member] = await db
-      .select()
-      .from(members)
-      .where(eq(members.id, id))
-      .limit(1);
-    return member;
+    try {
+      const [member] = await db
+        .select()
+        .from(members)
+        .where(eq(members.id, id))
+        .limit(1);
+      return member;
+    } catch (error) {
+      console.error("Error getting member:", error);
+      return null;
+    }
   }
 
   async createMember(data: InsertMember) {
@@ -260,19 +319,20 @@ export class Storage {
     const activeLoans = await db
       .select({ count: sql<number>`COUNT(*) AS total` })
       .from(loans)
-      .where(eq(loans.status, "active"));
+      .where(eq(loans.isRepaid, false));
 
     const totalPenalties = await db
       .select({ sum: sql<number>`SUM(amount) AS total` })
       .from(penalties)
       .where(eq(penalties.isWaived, false));
 
-    return {
-      totalMembers: totalMembers[0]?.count || 0,
-      totalContributions: parseFloat(totalContributions[0]?.sum || "0"),
-      activeLoans: activeLoans[0]?.count || 0,
-      totalPenalties: parseFloat(totalPenalties[0]?.sum || "0"),
+    const result = {
+      totalMembers: Number(totalMembers[0]?.count) || 0,
+      totalContributions: Number(totalContributions[0]?.sum) || 0,
+      activeLoans: Number(activeLoans[0]?.count) || 0,
+      totalPenalties: Number(totalPenalties[0]?.sum) || 0,
     };
+    return result;
   }
 
   // Recent activity
@@ -326,7 +386,7 @@ export class Storage {
     // Combine and format data
     const contributionRecords = contributions.map(c => ({
       type: 'contribution',
-      date: c.paymentDate || c.createdAt,
+      date: c.paymentDate ? new Date(c.paymentDate) : new Date(c.createdAt),
       memberName: c.memberName,
       memberEmail: c.memberEmail,
       amount: c.amount,
@@ -336,7 +396,7 @@ export class Storage {
 
     const loanRecords = loans.map(l => ({
       type: 'loan',
-      date: l.issueDate,
+      date: new Date(l.issueDate),
       memberName: l.member?.name,
       memberEmail: l.member?.email,
       amount: l.amount,
@@ -346,7 +406,7 @@ export class Storage {
 
     const penaltyRecords = penalties.map(p => ({
       type: 'penalty',
-      date: p.appliedDate,
+      date: new Date(p.appliedDate),
       memberName: p.memberName,
       memberEmail: p.memberEmail,
       amount: p.amount,
@@ -363,7 +423,7 @@ export class Storage {
 
     if (filters.month !== "all") {
       data = data.filter(item => {
-        const itemDate = new Date(item.date);
+        const itemDate = item.date;
         return itemDate.toISOString().slice(0, 7) === filters.month;
       });
     }
@@ -376,7 +436,7 @@ export class Storage {
       data = data.filter(item => item.status === filters.status);
     }
 
-    return data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return data.sort((a, b) => b.date.getTime() - a.date.getTime());
   }
 }
 

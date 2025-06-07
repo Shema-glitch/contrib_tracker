@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import pgSession from "connect-pg-simple";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { storage } from "./storage";
@@ -9,21 +10,51 @@ import { db } from "./db";
 
 const app = express();
 
+// CORS configuration
+const allowedOrigins = process.env.NODE_ENV === "production"
+  ? [process.env.PRODUCTION_URL || "https://your-production-domain.com"]
+  : ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5000", "http://127.0.0.1:5000"];
+
+app.use(cors({
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true,
+  optionsSuccessStatus: 200,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+}));
+
 // Session configuration
+const pgStore = pgSession(session);
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "your-secret-key",
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: process.env.NODE_ENV === "production",
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: "lax"
-  },
-    store: new (pgSession(session))({
-      pool: db.pool,
-      tableName: "sessions"
+    resave: false,
+    saveUninitialized: false,
+    rolling: true, // Refresh session with each request
+    cookie: {
+      secure: process.env.NODE_ENV === "production", // Only use secure in production
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      sameSite: "lax",
+      path: "/"
+    },
+    store: new pgStore({
+      createTableIfMissing: true,
+      tableName: "sessions",
+      conObject: {
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false
+      },
+      pruneSessionInterval: 60 // Clean up expired sessions every minute
     })
   })
 );
@@ -61,7 +92,24 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
+async function main() {
+  // Initialize storage
+  await storage.init();
+
+  // Create admin user if it doesn't exist
+  const adminEmail = "charmantshema112@gmail.com";
+  const adminPassword = "123456";
+  
+  try {
+    const existingAdmin = await storage.getAdminByEmail(adminEmail);
+    if (!existingAdmin) {
+      await storage.createAdmin(adminEmail, "Admin", adminPassword);
+      console.log("Admin user created successfully");
+    }
+  } catch (error) {
+    console.error("Error creating admin user:", error);
+  }
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -92,4 +140,6 @@ app.use((req, res, next) => {
   }, () => {
     log(`serving on port ${port}`);
   });
-})();
+}
+
+main();

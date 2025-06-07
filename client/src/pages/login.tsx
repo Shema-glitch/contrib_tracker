@@ -367,9 +367,9 @@ export default function LoginPage() {
         >
           <div className="text-center space-y-4">
             <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-200">
-              Simplify Member
+              FundSync
             </h2>
-            <div className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+            <div className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
               Contribution Management
             </div>
           </div>
