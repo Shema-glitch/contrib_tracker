@@ -11,4 +11,10 @@ export default defineConfig({
   dbCredentials: {
     url: process.env.DATABASE_URL,
   },
+  // Add strict mode and force flag
+  strict: true,
+  verbose: true,
+  push: {
+    mode: "force"  // This will drop all tables and recreate them
+  }
 });

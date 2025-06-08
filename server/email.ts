@@ -61,17 +61,17 @@ export async function sendOtpEmail(email: string, otp: string) {
   }
 }
 
-export async function sendContributionReminder(email: string, name: string, month: string) {
+export async function sendContributionReminder({ to, name, dueAmount, dueDate }: { to: string; name: string; dueAmount: string; dueDate: string }) {
   const mailOptions = {
     from: 'charmantshema112@gmail.com',
-    to: email,
+    to,
     subject: "FundSync Contribution Reminder",
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #2563eb;">FundSync Contribution Reminder</h2>
         <p>Dear ${name},</p>
-        <p>This is a friendly reminder that your contribution for ${month} is pending.</p>
-        <p>Please make your contribution at your earliest convenience to avoid any late fees.</p>
+        <p>This is a friendly reminder that your contribution of ${dueAmount} RWF is due on ${dueDate}.</p>
+        <p>Please make your contribution before the due date to avoid any late fees.</p>
         <p style="color: #6b7280; font-size: 14px;">This is an automated reminder. Please do not reply to this email.</p>
         <p style="color: #6b7280; font-size: 12px; margin-top: 20px;">FundSync - Empowering Contributions, Securing Loans, Building Futures.</p>
       </div>

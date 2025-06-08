@@ -153,14 +153,71 @@ export class Storage {
   async getMember(id: number) {
     try {
       const [member] = await db
-        .select()
+        .select({
+          id: members.id,
+          name: members.name,
+          email: members.email,
+          memberId: members.memberId,
+          joinDate: members.joinDate,
+          totalContributions: members.totalContributions,
+          isActive: members.isActive,
+          createdAt: members.createdAt,
+          contributions: sql`COALESCE(
+            jsonb_agg(
+              jsonb_build_object(
+                'id', ${contributions.id},
+                'month', ${contributions.month},
+                'amount', ${contributions.amount},
+                'paymentDate', ${contributions.paymentDate},
+                'dueDate', ${contributions.dueDate},
+                'isPaid', ${contributions.isPaid},
+                'lateFee', ${contributions.lateFee}
+              ) ORDER BY ${contributions.month} DESC
+            ) FILTER (WHERE ${contributions.id} IS NOT NULL),
+            '[]'::jsonb
+          )::json as contributions`,
+          loans: sql`COALESCE(
+            jsonb_agg(
+              jsonb_build_object(
+                'id', ${loans.id},
+                'amount', ${loans.amount},
+                'issueDate', ${loans.issueDate},
+                'dueDate', ${loans.dueDate},
+                'repaidAmount', ${loans.repaidAmount},
+                'isRepaid', ${loans.isRepaid},
+                'penalty', ${loans.penalty},
+                'notes', ${loans.notes}
+              ) ORDER BY ${loans.issueDate} DESC
+            ) FILTER (WHERE ${loans.id} IS NOT NULL),
+            '[]'::jsonb
+          )::json as loans`,
+          penalties: sql`COALESCE(
+            jsonb_agg(
+              jsonb_build_object(
+                'id', ${penalties.id},
+                'type', ${penalties.type},
+                'amount', ${penalties.amount},
+                'appliedDate', ${penalties.appliedDate},
+                'isPaid', ${penalties.isPaid},
+                'isWaived', ${penalties.isWaived},
+                'reason', ${penalties.reason}
+              ) ORDER BY ${penalties.appliedDate} DESC
+            ) FILTER (WHERE ${penalties.id} IS NOT NULL),
+            '[]'::jsonb
+          )::json as penalties`
+        })
         .from(members)
+        .leftJoin(contributions, eq(contributions.memberId, members.id))
+        .leftJoin(loans, eq(loans.memberId, members.id))
+        .leftJoin(penalties, eq(penalties.memberId, members.id))
         .where(eq(members.id, id))
+        .groupBy(members.id)
         .limit(1);
-      return member;
+
+      return member || null;
     } catch (error) {
-      console.error("Error getting member:", error);
-      return null;
+      console.error("Error getting member details:", error);
+      throw new Error("Failed to get member details");
     }
   }
 

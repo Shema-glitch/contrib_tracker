@@ -9,6 +9,7 @@ import { generateCSV, generateExcel, getFilename } from "./utils";
 import { sendEmail } from "./email";
 import { requireAuth } from "./auth";
 import notificationsRouter from "./notifications";
+import { Error as ErrorType } from './types';
 
 // Validation schemas
 const loginSchema = z.object({
@@ -46,13 +47,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const admin = await storage.getAdminByEmail(email);
       if (!admin) {
         return res.status(404).json({ message: "Admin not found" });
-      }
-
-      if (!admin.passwordHash) {
-        return res.status(400).json({ 
-          message: "This account uses OTP-only login. Please use the 'Send OTP' option.",
-          requiresOtp: true 
-        });
       }
 
       const isValidPassword = await storage.validateAdminPassword(email, password);
@@ -100,15 +94,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Admin not found" });
       }
 
-      // If password is set, require traditional login first
-      if (admin.passwordHash) {
-        return res.status(400).json({ 
-          message: "This account requires password authentication first. Please use the login form.",
-          requireTraditionalLogin: true 
-        });
-      }
-
-      // Generate OTP for password-less accounts
+      // Generate OTP
       const token = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
@@ -231,6 +217,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/members/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid member ID" });
+      }
       const member = await storage.getMember(id);
       if (!member) {
         return res.status(404).json({ message: "Member not found" });
@@ -238,7 +227,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(member);
     } catch (error) {
       console.error("Error fetching member:", error);
-      res.status(500).json({ message: "Failed to fetch member" });
+      res.status(500).json({ message: "Failed to fetch member details" });
     }
   });
 
@@ -250,6 +239,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating member:", error);
       res.status(500).json({ message: "Failed to create member" });
+    }
+  });
+
+  // Member routes
+  app.post("/api/members/:id/record-payment", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid member ID" });
+      }
+
+      const paymentData = recordPaymentSchema.parse({ ...req.body, memberId: id });
+      
+      const contribution = await storage.recordContribution(paymentData);
+      
+      // Create a notification for the payment
+      await storage.insertNotification({
+        userId: id,
+        type: "PAYMENT_RECORDED",
+        title: "Payment Recorded",
+        message: `Your contribution of ${paymentData.amount} RWF for ${paymentData.month} has been recorded`,
+        data: {
+          contributionId: contribution.id,
+          amount: paymentData.amount,
+          month: paymentData.month,
+          paymentDate: paymentData.paymentDate,
+          lateFee: paymentData.applyLateFee ? "500" : "0"
+        }
+      });
+
+      res.status(201).json({
+        success: true,
+        message: "Payment recorded successfully",
+        data: contribution
+      });
+    } catch (error) {
+      console.error("Error recording payment:", error);
+      if (error instanceof Error) {
+        res.status(500).json({ message: "Failed to record payment", details: error.message });
+      } else {
+        res.status(500).json({ message: "Failed to record payment" });
+      }
     }
   });
 
@@ -370,6 +401,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const members = await storage.getMembers();
       const currentMonth = new Date().toISOString().slice(0, 7);
+      const dueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+      const dueAmount = "5,000";
 
       for (const member of members) {
         const contributions = await storage.getContributionsByMember(member.id);
@@ -379,7 +412,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (!hasCurrentMonthContribution) {
           try {
-            await sendContributionReminder(member.email, member.name, currentMonth);
+            await sendContributionReminder({
+              to: member.email,
+              name: member.name,
+              dueAmount,
+              dueDate: dueDate.toLocaleDateString()
+            });
           } catch (emailError) {
             console.error(`Failed to send reminder to ${member.email}:`, emailError);
           }
@@ -395,7 +433,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/members/:memberId/send-reminder", requireAuth, async (req, res) => {
     try {
-      const { memberId } = req.params;
+      const memberId = parseInt(req.params.memberId);
+      if (isNaN(memberId)) {
+        return res.status(400).json({ message: "Invalid member ID" });
+      }
+
       const member = await storage.getMember(memberId);
       
       if (!member) {

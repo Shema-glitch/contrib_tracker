@@ -1,4 +1,5 @@
-import { pgTable, text, serial, integer, boolean, decimal, timestamp, varchar, date, json, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, decimal, timestamp, varchar, date, json, jsonb } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -59,12 +60,12 @@ export const penalties = pgTable("penalties", {
 // Notifications table
 export const notifications = pgTable("notifications", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => members.id),
+  userId: integer("user_id").references(() => members.id).notNull(),
   type: varchar("type", { length: 50 }).notNull(),
   title: text("title").notNull(),
   message: text("message").notNull(),
   is_read: boolean("is_read").default(false),
-  data: json("data"),
+  data: jsonb("data").default(sql`'{}'::jsonb`),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -95,7 +96,7 @@ export const sessions = pgTable("sessions", {
 
 // Users table
 export const users = pgTable("users", {
-  id: uuid("id").primaryKey().defaultRandom(),
+  id: serial("id").primaryKey(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 255 }).notNull(),
   isAdmin: boolean("is_admin").default(false),
