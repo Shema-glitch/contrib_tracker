@@ -30,19 +30,73 @@ import LoanModal from "@/components/modals/loan-modal";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
+interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+interface Member {
+  id: number;
+  name: string;
+  email: string;
+  isActive: boolean;
+}
+
+interface Loan {
+  id: number;
+  memberId: number;
+  amount: string;
+  dueDate: string;
+  issueDate: string;
+  repaidAmount: string | null;
+  isRepaid: boolean;
+  notes: string | null;
+}
+
 export default function Loans() {
   const [showLoanModal, setShowLoanModal] = useState(false);
   const [loanFilter, setLoanFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: loans, isLoading: loansLoading } = useQuery({
-    queryKey: ["/api/loans"],
+  const { data: loansResponse, isLoading: loansLoading } = useQuery<PaginatedResponse<Loan>>({
+    queryKey: ["loans", page, pageSize, searchQuery, loanFilter],
+    queryFn: async () => {
+      const response = await fetch(
+        `/api/loans?page=${page}&pageSize=${pageSize}&search=${searchQuery}&status=${loanFilter}`,
+        {
+          credentials: "include",
+        }
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch loans");
+      }
+      return response.json();
+    },
   });
 
-  const { data: members } = useQuery({
-    queryKey: ["/api/members"],
+  const { data: membersResponse, isLoading: membersLoading } = useQuery<PaginatedResponse<Member>>({
+    queryKey: ["members"],
+    queryFn: async () => {
+      const response = await fetch("/api/members?pageSize=1000", {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch members");
+      }
+      return response.json();
+    },
   });
+
+  const members = membersResponse?.data || [];
+  const loans = loansResponse?.data || [];
+  const isLoading = loansLoading || membersLoading;
 
   const updateLoanMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: number; updates: any }) => {
@@ -94,7 +148,12 @@ export default function Loans() {
     }
   };
 
-  if (loansLoading) {
+  const getMemberName = (memberId: number) => {
+    const member = members.find((m) => m.id === memberId);
+    return member ? member.name : "Unknown Member";
+  };
+
+  if (isLoading) {
     return (
       <div className="p-6">
         <div className="animate-pulse space-y-6">
@@ -226,7 +285,7 @@ export default function Loans() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredLoans.map((loan: any) => {
+                {loans?.map((loan: any) => {
                   const member = members?.find((m: any) => m.id === loan.memberId);
                   const dueDate = new Date(loan.dueDate);
                   const today = new Date();
@@ -304,6 +363,42 @@ export default function Loans() {
                 No loans found matching your criteria.
               </div>
             )}
+
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-between mt-4">
+              <div className="flex items-center gap-2">
+                <Select value={pageSize.toString()} onValueChange={(value) => setPageSize(Number(value))}>
+                  <SelectTrigger className="w-[100px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5 / page</SelectItem>
+                    <SelectItem value="10">10 / page</SelectItem>
+                    <SelectItem value="20">20 / page</SelectItem>
+                    <SelectItem value="50">50 / page</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-gray-500">
+                  Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, loansResponse?.total || 0)} of {loansResponse?.total || 0}
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setPage(page - 1)}
+                  disabled={page === 1}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setPage(page + 1)}
+                  disabled={!loansResponse || page >= loansResponse.totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

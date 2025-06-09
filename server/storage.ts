@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, sql, type SQL } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import {
   members,
@@ -14,6 +14,29 @@ import {
   type InsertContribution,
   type InsertLoan,
 } from "@shared/schema";
+
+interface PaginationParams {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  status?: string;
+  month?: string;
+}
+
+interface PaginatedResult<T> {
+  data: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+type QueryBuilder = ReturnType<typeof db.select>;
+
+interface WhereCondition {
+  sql: string;
+  params: unknown[];
+}
 
 export class Storage {
   async init() {
@@ -146,8 +169,38 @@ export class Storage {
   }
 
   // Member methods
-  async getMembers() {
-    return await db.select().from(members).orderBy(desc(members.createdAt));
+  async getMembers({ page = 1, pageSize = 10, search = '', status }: PaginationParams = {}): Promise<PaginatedResult<typeof members.$inferSelect>> {
+    const offset = (page - 1) * pageSize;
+    const conditions: SQL[] = [];
+    
+    if (search) {
+      conditions.push(sql`(LOWER(${members.name}::text) LIKE ${`%${search.toLowerCase()}%`} OR LOWER(${members.email}::text) LIKE ${`%${search.toLowerCase()}%`})`);
+    }
+    
+    if (status === 'active') {
+      conditions.push(sql`${members.isActive} = true`);
+    } else if (status === 'inactive') {
+      conditions.push(sql`${members.isActive} = false`);
+    }
+    
+    const baseQuery = db.select().from(members);
+    const query = conditions.length > 0
+      ? baseQuery.where(sql`${and(...conditions)}`)
+      : baseQuery;
+
+    const [items, totalResults] = await Promise.all([
+      query.limit(pageSize).offset(offset).orderBy(desc(members.createdAt)),
+      db.select({ count: sql<number>`count(*)` }).from(members)
+        .then(result => Number(result[0].count))
+    ]);
+
+    return {
+      data: items,
+      total: totalResults,
+      page,
+      pageSize,
+      totalPages: Math.ceil(totalResults / pageSize)
+    };
   }
 
   async getMember(id: number) {
@@ -240,23 +293,43 @@ export class Storage {
   }
 
   // Contribution methods
-  async getContributions() {
-    return await db
-      .select({
-        id: contributions.id,
-        memberId: contributions.memberId,
-        amount: contributions.amount,
-        month: contributions.month,
-        paymentDate: contributions.paymentDate,
-        isPaid: contributions.isPaid,
-        lateFee: contributions.lateFee,
-        createdAt: contributions.createdAt,
-        memberName: members.name,
-        memberEmail: members.email,
-      })
-      .from(contributions)
-      .leftJoin(members, eq(contributions.memberId, members.id))
-      .orderBy(desc(contributions.createdAt));
+  async getContributions({ page = 1, pageSize = 10, search = '', month }: PaginationParams = {}): Promise<PaginatedResult<typeof contributions.$inferSelect>> {
+    const offset = (page - 1) * pageSize;
+    const conditions: SQL[] = [];
+    
+    if (month && month !== 'all') {
+      if (month === 'current') {
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        conditions.push(sql`DATE_TRUNC('month', ${contributions.month}::date) = DATE_TRUNC('month', ${currentMonth}::date)`);
+      } else {
+        try {
+          const parsedMonth = new Date(month + '-01').toISOString().slice(0, 7);
+          conditions.push(sql`DATE_TRUNC('month', ${contributions.month}::date) = DATE_TRUNC('month', ${parsedMonth}::date)`);
+        } catch (e) {
+          console.error('Invalid month format:', month);
+          // Skip the condition if the month is invalid
+        }
+      }
+    }
+    
+    const baseQuery = db.select().from(contributions);
+    const query = conditions.length > 0
+      ? baseQuery.where(sql`${and(...conditions)}`)
+      : baseQuery;
+
+    const [items, totalResults] = await Promise.all([
+      query.limit(pageSize).offset(offset).orderBy(desc(contributions.createdAt)),
+      db.select({ count: sql<number>`count(*)` }).from(contributions)
+        .then(result => Number(result[0].count))
+    ]);
+
+    return {
+      data: items,
+      total: totalResults,
+      page,
+      pageSize,
+      totalPages: Math.ceil(totalResults / pageSize)
+    };
   }
 
   async getContributionsByMember(memberId: number) {
@@ -276,26 +349,38 @@ export class Storage {
   }
 
   // Loan methods
-  async getLoans() {
-    const loans = await db.query.loans.findMany({
-      with: {
-        member: true
-      },
-      columns: {
-        id: true,
-        memberId: true,
-        amount: true,
-        issueDate: true,
-        dueDate: true,
-        repaidAmount: true,
-        isRepaid: true,
-        penalty: true,
-        notes: true,
-        createdAt: true
-      }
-    });
+  async getLoans({ page = 1, pageSize = 10, search = '', status }: PaginationParams = {}): Promise<PaginatedResult<typeof loans.$inferSelect>> {
+    const offset = (page - 1) * pageSize;
+    const conditions: SQL[] = [];
+    
+    if (search) {
+      conditions.push(sql`CAST(${loans.amount} AS text) LIKE ${`%${search}%`}`);
+    }
 
-    return loans;
+    if (status === 'active') {
+      conditions.push(sql`${loans.isRepaid} = false`);
+    } else if (status === 'repaid') {
+      conditions.push(sql`${loans.isRepaid} = true`);
+    }
+    
+    const baseQuery = db.select().from(loans);
+    const query = conditions.length > 0
+      ? baseQuery.where(sql`${and(...conditions)}`)
+      : baseQuery;
+
+    const [items, totalResults] = await Promise.all([
+      query.limit(pageSize).offset(offset).orderBy(desc(loans.createdAt)),
+      db.select({ count: sql<number>`count(*)` }).from(loans)
+        .then(result => Number(result[0].count))
+    ]);
+
+    return {
+      data: items,
+      total: totalResults,
+      page,
+      pageSize,
+      totalPages: Math.ceil(totalResults / pageSize)
+    };
   }
 
   async createLoan(data: InsertLoan) {
@@ -304,24 +389,40 @@ export class Storage {
   }
 
   // Penalty methods
-  async getPenalties() {
-    return await db
-      .select({
-        id: penalties.id,
-        memberId: penalties.memberId,
-        type: penalties.type,
-        amount: penalties.amount,
-        reason: penalties.reason,
-        appliedDate: penalties.appliedDate,
-        isPaid: penalties.isPaid,
-        isWaived: penalties.isWaived,
-        createdAt: penalties.createdAt,
-        memberName: members.name,
-        memberEmail: members.email,
-      })
-      .from(penalties)
-      .leftJoin(members, eq(penalties.memberId, members.id))
-      .orderBy(desc(penalties.createdAt));
+  async getPenalties({ page = 1, pageSize = 10, search = '', status }: PaginationParams = {}): Promise<PaginatedResult<typeof penalties.$inferSelect>> {
+    const offset = (page - 1) * pageSize;
+    const conditions: SQL[] = [];
+    
+    if (search) {
+      conditions.push(sql`CAST(${penalties.amount} AS text) LIKE ${`%${search}%`}`);
+    }
+
+    if (status === 'paid') {
+      conditions.push(sql`${penalties.isPaid} = true`);
+    } else if (status === 'unpaid') {
+      conditions.push(sql`${penalties.isPaid} = false`);
+    } else if (status === 'waived') {
+      conditions.push(sql`${penalties.isWaived} = true`);
+    }
+    
+    const baseQuery = db.select().from(penalties);
+    const query = conditions.length > 0
+      ? baseQuery.where(sql`${and(...conditions)}`)
+      : baseQuery;
+
+    const [items, totalResults] = await Promise.all([
+      query.limit(pageSize).offset(offset).orderBy(desc(penalties.createdAt)),
+      db.select({ count: sql<number>`count(*)` }).from(penalties)
+        .then(result => Number(result[0].count))
+    ]);
+
+    return {
+      data: items,
+      total: totalResults,
+      page,
+      pageSize,
+      totalPages: Math.ceil(totalResults / pageSize)
+    };
   }
 
   // Settings methods
@@ -436,40 +537,78 @@ export class Storage {
     let data: any[] = [];
 
     // Get all data
-    const contributions = await this.getContributions();
-    const loans = await this.getLoans();
-    const penalties = await this.getPenalties();
+    const [contributionsResult, loansResult, penaltiesResult] = await Promise.all([
+      this.getContributions(),
+      this.getLoans(),
+      this.getPenalties()
+    ]);
+
+    // Get all members for lookup
+    const allMembers = await db.select().from(members);
+    const memberMap = new Map(allMembers.map(m => [m.id, m]));
 
     // Combine and format data
-    const contributionRecords = contributions.map(c => ({
-      type: 'contribution',
-      date: c.paymentDate ? new Date(c.paymentDate) : new Date(c.createdAt),
-      memberName: c.memberName,
-      memberEmail: c.memberEmail,
-      amount: c.amount,
-      status: c.isPaid ? 'paid' : 'unpaid',
-      notes: c.lateFee ? `Late fee: ${c.lateFee}` : ''
-    }));
+    const contributionRecords = (contributionsResult.data || []).map((c: any) => {
+      const member = memberMap.get(c.memberId);
+      let date: Date;
+      if (typeof c.paymentDate === 'string' && c.paymentDate) {
+        date = new Date(c.paymentDate);
+      } else if (typeof c.createdAt === 'string' && c.createdAt) {
+        date = new Date(c.createdAt);
+      } else {
+        date = new Date();
+      }
+      return {
+        type: 'contribution',
+        date,
+        memberId: c.memberId,
+        memberName: member?.name || 'Unknown Member',
+        memberEmail: member?.email || '',
+        amount: c.amount,
+        status: c.isPaid ? 'paid' : 'unpaid',
+        notes: c.lateFee ? `Late fee: ${c.lateFee}` : ''
+      };
+    });
 
-    const loanRecords = loans.map(l => ({
-      type: 'loan',
-      date: new Date(l.issueDate),
-      memberName: l.member?.name,
-      memberEmail: l.member?.email,
-      amount: l.amount,
-      status: l.isRepaid ? 'repaid' : 'active',
-      notes: l.notes
-    }));
+    const loanRecords = (loansResult.data || []).map((l: any) => {
+      const member = memberMap.get(l.memberId);
+      let date: Date;
+      if (typeof l.issueDate === 'string' && l.issueDate) {
+        date = new Date(l.issueDate);
+      } else {
+        date = new Date();
+      }
+      return {
+        type: 'loan',
+        date,
+        memberId: l.memberId,
+        memberName: member?.name || 'Unknown Member',
+        memberEmail: member?.email || '',
+        amount: l.amount,
+        status: l.isRepaid ? 'repaid' : 'active',
+        notes: l.notes || ''
+      };
+    });
 
-    const penaltyRecords = penalties.map(p => ({
-      type: 'penalty',
-      date: new Date(p.appliedDate),
-      memberName: p.memberName,
-      memberEmail: p.memberEmail,
-      amount: p.amount,
-      status: p.isPaid ? 'paid' : p.isWaived ? 'waived' : 'outstanding',
-      notes: p.reason
-    }));
+    const penaltyRecords = (penaltiesResult.data || []).map((p: any) => {
+      const member = memberMap.get(p.memberId);
+      let date: Date;
+      if (typeof p.appliedDate === 'string' && p.appliedDate) {
+        date = new Date(p.appliedDate);
+      } else {
+        date = new Date();
+      }
+      return {
+        type: 'penalty',
+        date,
+        memberId: p.memberId,
+        memberName: member?.name || 'Unknown Member',
+        memberEmail: member?.email || '',
+        amount: p.amount,
+        status: p.isPaid ? 'paid' : p.isWaived ? 'waived' : 'outstanding',
+        notes: p.reason || ''
+      };
+    });
 
     data = [...contributionRecords, ...loanRecords, ...penaltyRecords];
 

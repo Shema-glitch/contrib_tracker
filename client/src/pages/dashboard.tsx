@@ -16,25 +16,86 @@ import {
 import { Search, Eye, CreditCard, Mail } from "lucide-react";
 import { useState } from "react";
 
+interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+interface Member {
+  id: number;
+  name: string;
+  memberId: string;
+  email: string;
+  isActive: boolean;
+  totalContributions: string;
+}
+
+interface DashboardStats {
+  totalContributionsThisMonth: string;
+  activeLoans: number;
+  latePayments: number;
+  penaltiesCollected: string;
+}
+
+interface ActivityItem {
+  id: number;
+  type: string;
+  description: string;
+  date: string;
+}
+
 export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ["/api/dashboard/stats"],
+  const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
+    queryKey: ["dashboard", "stats"],
+    queryFn: async () => {
+      const response = await fetch("/api/dashboard/stats", {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch dashboard stats");
+      }
+      return response.json();
+    },
   });
 
-  const { data: members, isLoading: membersLoading } = useQuery({
-    queryKey: ["/api/members"],
+  const { data: membersResponse, isLoading: membersLoading } = useQuery<PaginatedResponse<Member>>({
+    queryKey: ["members", "dashboard"],
+    queryFn: async () => {
+      const response = await fetch("/api/members?pageSize=1000", {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch members");
+      }
+      return response.json();
+    },
   });
 
-  const { data: recentActivity } = useQuery({
-    queryKey: ["/api/dashboard/recent-activity"],
+  const { data: recentActivity } = useQuery<ActivityItem[]>({
+    queryKey: ["dashboard", "recent-activity"],
+    queryFn: async () => {
+      const response = await fetch("/api/dashboard/recent-activity", {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch recent activity");
+      }
+      return response.json();
+    },
   });
 
-  const filteredMembers = members?.filter((member: any) =>
-    member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    member.memberId.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+  const members = membersResponse?.data || [];
+  const filteredMembers = searchQuery
+    ? members.filter((member) =>
+        member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        member.memberId.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : members;
 
   return (
     <div className="p-6 space-y-6">
@@ -42,6 +103,7 @@ export default function Dashboard() {
         <h1 className="text-2xl font-bold">FundSync Dashboard</h1>
         <p className="text-muted-foreground">Empowering Contributions, Securing Loans, Building Futures.</p>
       </div>
+
       {/* Stats Cards */}
       <StatsCards stats={stats} isLoading={statsLoading} />
 
@@ -51,39 +113,27 @@ export default function Dashboard() {
         
         {/* Recent Activity */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg font-semibold">Recent Activity</CardTitle>
-            <Button variant="outline" size="sm">View all</Button>
+          <CardHeader>
+            <CardTitle>Recent Activity</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {recentActivity?.slice(0, 5).map((activity: any, index: number) => (
-                <div key={index} className="flex items-center justify-between py-3 border-b border-border last:border-b-0">
-                  <div className="flex items-center">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      activity.type === 'contribution' ? 'bg-green-100 dark:bg-green-900/20' :
-                      activity.type === 'loan' ? 'bg-blue-100 dark:bg-blue-900/20' :
-                      'bg-orange-100 dark:bg-orange-900/20'
-                    }`}>
-                      <CreditCard className={`h-4 w-4 ${
-                        activity.type === 'contribution' ? 'text-green-600 dark:text-green-400' :
-                        activity.type === 'loan' ? 'text-blue-600 dark:text-blue-400' :
-                        'text-orange-600 dark:text-orange-400'
-                      }`} />
+            {recentActivity?.length === 0 ? (
+              <p className="text-center text-muted-foreground">No recent activity</p>
+            ) : (
+              <div className="space-y-4">
+                {recentActivity?.map((activity) => (
+                  <div key={`activity-${activity.id}`} className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{activity.type}</p>
+                      <p className="text-sm text-muted-foreground">{activity.description}</p>
                     </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium">{activity.description}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(activity.date).toLocaleString()}
-                      </p>
-                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(activity.date).toLocaleDateString()}
+                    </p>
                   </div>
-                  <span className="text-sm font-medium">
-                    {parseFloat(activity.amount).toLocaleString()} RWF
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -92,85 +142,73 @@ export default function Dashboard() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Member Overview</CardTitle>
-            <div className="flex items-center space-x-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <CardTitle>Members Overview</CardTitle>
+            <div className="flex items-center space-x-2">
+              <div className="relative w-64">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search members..."
+                  className="pl-8"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 w-64"
                 />
               </div>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          {membersLoading ? (
-            <div className="text-center py-8">Loading members...</div>
-          ) : (
-            <Table>
-              <TableHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Member ID</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Total Contributions</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {membersLoading ? (
                 <TableRow>
-                  <TableHead>Member</TableHead>
-                  <TableHead>Total Contributions</TableHead>
-                  <TableHead>This Month</TableHead>
-                  <TableHead>Loan Eligible</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableCell colSpan={5} className="text-center">
+                    Loading members...
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredMembers.slice(0, 10).map((member: any) => {
-                  const totalContributions = parseFloat(member.totalContributions || "0");
-                  const isLoanEligible = totalContributions >= 30000;
-                  
-                  return (
-                    <TableRow key={member.id}>
-                      <TableCell>
-                        <div className="flex items-center">
-                          <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                            <span className="text-primary font-medium text-sm">
-                              {member.name.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
-                            </span>
-                          </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium">{member.name}</div>
-                            <div className="text-sm text-muted-foreground">ID: {member.memberId}</div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {totalContributions.toLocaleString()} RWF
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">Paid</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={isLoanEligible ? "default" : "destructive"}>
-                          {isLoanEligible ? "Yes" : "No"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="default">Active</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button variant="ghost" size="sm">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm">
-                            <Mail className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
+              ) : filteredMembers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center">
+                    No members found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredMembers.map((member) => (
+                  <TableRow key={member.id}>
+                    <TableCell>{member.memberId}</TableCell>
+                    <TableCell>{member.name}</TableCell>
+                    <TableCell>${member.totalContributions}</TableCell>
+                    <TableCell>
+                      <Badge variant={member.isActive ? "default" : "secondary"}>
+                        {member.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="icon">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon">
+                          <CreditCard className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon">
+                          <Mail className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>

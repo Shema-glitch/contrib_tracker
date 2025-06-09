@@ -30,6 +30,14 @@ import { Search, MoreHorizontal, Eye, CreditCard, HandHeart, Mail } from "lucide
 import { MemberDetailsModal } from "@/components/modals/member-details-modal";
 import { RecordPaymentModal } from "@/components/modals/record-payment-modal";
 
+interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 interface Member {
   id: number;
   name: string;
@@ -45,20 +53,25 @@ export default function Members() {
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: members, isLoading } = useQuery<Member[]>({
-    queryKey: ["/api/members"],
+  const { data: paginatedMembers, isLoading } = useQuery<PaginatedResponse<Member>>({
+    queryKey: ["members", page, pageSize, searchQuery, statusFilter],
     queryFn: async () => {
-      const response = await fetch("/api/members", {
-        credentials: "include"
-      });
+      const response = await fetch(
+        `/api/members?page=${page}&pageSize=${pageSize}&search=${searchQuery}&status=${statusFilter}`,
+        {
+          credentials: "include",
+        }
+      );
       if (!response.ok) {
         throw new Error("Failed to fetch members");
       }
       return response.json();
-    }
+    },
   });
 
   const sendReminderMutation = useMutation({
@@ -108,7 +121,7 @@ export default function Members() {
     await sendReminderMutation.mutate(memberId);
   };
 
-  const filteredMembers = members?.filter((member) => {
+  const filteredMembers = paginatedMembers?.data.filter((member) => {
     const matchesSearch = member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          member.memberId.toLowerCase().includes(searchQuery.toLowerCase());
     
@@ -133,7 +146,7 @@ export default function Members() {
   }
 
   return (
-    <>
+    <div className="container mx-auto py-10">
       <div className="p-6 space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -179,7 +192,7 @@ export default function Members() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredMembers.map((member) => {
+                {paginatedMembers?.data.map((member) => {
                   const totalContributions = parseFloat(member.totalContributions || "0");
                   const isLoanEligible = totalContributions >= 30000;
                   
@@ -240,6 +253,42 @@ export default function Members() {
                 })}
               </TableBody>
             </Table>
+            
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-between mt-4">
+              <div className="flex items-center gap-2">
+                <Select value={pageSize.toString()} onValueChange={(value) => setPageSize(Number(value))}>
+                  <SelectTrigger className="w-[100px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5 / page</SelectItem>
+                    <SelectItem value="10">10 / page</SelectItem>
+                    <SelectItem value="20">20 / page</SelectItem>
+                    <SelectItem value="50">50 / page</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-gray-500">
+                  Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, paginatedMembers?.total || 0)} of {paginatedMembers?.total || 0}
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setPage(page - 1)}
+                  disabled={page === 1}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setPage(page + 1)}
+                  disabled={!paginatedMembers || page >= paginatedMembers.totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -261,6 +310,6 @@ export default function Members() {
           setSelectedMemberId(null);
         }}
       />
-    </>
+    </div>
   );
 }

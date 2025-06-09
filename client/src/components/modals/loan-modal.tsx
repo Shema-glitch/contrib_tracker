@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -29,6 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { useMembers, type Member } from "@/hooks/use-members";
 import { apiRequest } from "@/lib/queryClient";
 import { Info } from "lucide-react";
 
@@ -51,9 +52,7 @@ export default function LoanModal({ open, onOpenChange }: LoanModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: members } = useQuery({
-    queryKey: ["/api/members"],
-  });
+  const { members, isLoading: isLoadingMembers } = useMembers();
 
   const form = useForm<LoanFormData>({
     resolver: zodResolver(loanSchema),
@@ -91,7 +90,7 @@ export default function LoanModal({ open, onOpenChange }: LoanModalProps) {
   };
 
   const selectedMemberId = form.watch("memberId");
-  const selectedMember = members?.find((m: any) => m.id === selectedMemberId);
+  const selectedMember = members.find((m: Member) => m.id === selectedMemberId);
   const isEligible = selectedMember ? parseFloat(selectedMember.totalContributions || "0") >= 30000 : false;
 
   return (

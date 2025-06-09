@@ -34,6 +34,14 @@ const addLoanSchema = insertLoanSchema.extend({
   notes: z.string().optional(),
 });
 
+const paginationSchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().default(10),
+  search: z.string().optional(),
+  status: z.string().optional(),
+  month: z.string().optional(),
+});
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Traditional login with email and password
   app.post("/api/auth/login", async (req, res) => {
@@ -206,11 +214,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Members routes
   app.get("/api/members", requireAuth, async (req, res) => {
     try {
-      const members = await storage.getMembers();
-      res.json(members);
+      const { page, pageSize, search, status } = paginationSchema.parse(req.query);
+      const result = await storage.getMembers({ page, pageSize, search, status });
+      res.json(result);
     } catch (error) {
-      console.error("Error fetching members:", error);
-      res.status(500).json({ message: "Failed to fetch members" });
+      console.error('Error fetching members:', error);
+      res.status(400).json({ message: "Failed to fetch members", error: String(error) });
     }
   });
 
@@ -287,11 +296,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Contributions routes
   app.get("/api/contributions", requireAuth, async (req, res) => {
     try {
-      const contributions = await storage.getContributions();
-      res.json(contributions);
+      const { page, pageSize, search, month } = paginationSchema.parse(req.query);
+      const result = await storage.getContributions({ page, pageSize, search, month });
+      res.json(result);
     } catch (error) {
-      console.error("Error fetching contributions:", error);
-      res.status(500).json({ message: "Failed to fetch contributions" });
+      console.error('Error fetching contributions:', error);
+      res.status(400).json({ message: "Failed to fetch contributions", error: String(error) });
     }
   });
 
@@ -322,11 +332,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Loans routes
   app.get("/api/loans", requireAuth, async (req, res) => {
     try {
-      const loans = await storage.getLoans();
-      res.json(loans);
+      const { page, pageSize, search, status } = paginationSchema.parse(req.query);
+      const result = await storage.getLoans({ page, pageSize, search, status });
+      res.json(result);
     } catch (error) {
-      console.error("Error fetching loans:", error);
-      res.status(500).json({ message: "Failed to fetch loans" });
+      console.error('Error fetching loans:', error);
+      res.status(400).json({ message: "Failed to fetch loans", error: String(error) });
     }
   });
 
@@ -366,11 +377,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Penalties routes
   app.get("/api/penalties", requireAuth, async (req, res) => {
     try {
-      const penalties = await storage.getPenalties();
-      res.json(penalties);
+      const { page, pageSize, search, status } = paginationSchema.parse(req.query);
+      const result = await storage.getPenalties({ page, pageSize, search, status });
+      res.json(result);
     } catch (error) {
-      console.error("Error fetching penalties:", error);
-      res.status(500).json({ message: "Failed to fetch penalties" });
+      console.error('Error fetching penalties:', error);
+      res.status(400).json({ message: "Failed to fetch penalties", error: String(error) });
     }
   });
 

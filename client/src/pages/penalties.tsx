@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/use-toast";
 import {
   Table,
   TableBody,
@@ -25,105 +27,121 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Check, X, Mail, AlertTriangle, CheckCircle, Ban } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { useMembers } from "@/hooks/use-members";
+import { usePenalties, type Penalty } from "@/hooks/use-penalties";
 
 export default function Penalties() {
-  const [penaltyFilter, setPenaltyFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
-  const { data: penalties, isLoading: penaltiesLoading } = useQuery({
-    queryKey: ["/api/penalties"],
+  
+  const { members } = useMembers();
+  const { 
+    penalties,
+    isLoading: isLoadingPenalties,
+    total,
+    totalPages,
+    stats 
+  } = usePenalties({
+    page,
+    pageSize,
+    search: searchQuery,
+    status: statusFilter,
   });
 
-  const { data: members } = useQuery({
-    queryKey: ["/api/members"],
-  });
-
-  const updatePenaltyMutation = useMutation({
-    mutationFn: async ({ id, updates }: { id: number; updates: any }) => {
-      return apiRequest("PATCH", `/api/penalties/${id}`, updates);
+  const markAsPaidMutation = useMutation({
+    mutationFn: async (penalty: Penalty) => {
+      const response = await fetch(`/api/penalties/${penalty.id}/mark-paid`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to mark penalty as paid");
+      return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/penalties"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["penalties"] });
       toast({
         title: "Success",
-        description: "Penalty updated successfully",
+        description: "Penalty has been marked as paid.",
       });
     },
-    onError: (error: any) => {
+    onError: () => {
       toast({
         title: "Error",
-        description: error.message || "Failed to update penalty",
+        description: "Failed to mark penalty as paid.",
         variant: "destructive",
       });
     },
   });
 
-  const filteredPenalties = penalties?.filter((penalty: any) => {
-    if (penaltyFilter === "all") return true;
-    if (penaltyFilter === "contribution_late") return penalty.type === "contribution_late";
-    if (penaltyFilter === "loan_overdue") return penalty.type === "loan_overdue";
-    if (penaltyFilter === "outstanding") return !penalty.isPaid && !penalty.isWaived;
-    if (penaltyFilter === "resolved") return penalty.isPaid || penalty.isWaived;
-    return true;
-  }) || [];
-
-  const handleMarkPaid = (penaltyId: number) => {
-    updatePenaltyMutation.mutate({
-      id: penaltyId,
-      updates: { isPaid: true }
-    });
-  };
-
-  const handleWaivePenalty = (penaltyId: number) => {
-    updatePenaltyMutation.mutate({
-      id: penaltyId,
-      updates: { isWaived: true }
-    });
-  };
-
-  const handleSendNotice = (penalty: any) => {
-    const member = members?.find((m: any) => m.id === penalty.memberId);
-    if (member) {
-      toast({
-        title: "Notice Sent",
-        description: `Penalty notice sent to ${member.name}`,
+  const waivePenaltyMutation = useMutation({
+    mutationFn: async (penalty: Penalty) => {
+      const response = await fetch(`/api/penalties/${penalty.id}/waive`, {
+        method: "POST",
+        credentials: "include",
       });
-    }
+      if (!response.ok) throw new Error("Failed to waive penalty");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["penalties"] });
+      toast({
+        title: "Success",
+        description: "Penalty has been waived.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to waive penalty.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const sendNoticeMutation = useMutation({
+    mutationFn: async (penalty: Penalty) => {
+      const response = await fetch(`/api/penalties/${penalty.id}/send-notice`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to send notice");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Penalty notice has been sent.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to send penalty notice.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleMarkAsPaid = (penalty: Penalty) => {
+    markAsPaidMutation.mutate(penalty);
   };
 
-  if (penaltiesLoading) {
-    return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-muted rounded w-48"></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-32 bg-muted rounded"></div>
-            ))}
-          </div>
-          <div className="h-64 bg-muted rounded"></div>
-        </div>
-      </div>
-    );
-  }
+  const handleWaivePenalty = (penalty: Penalty) => {
+    waivePenaltyMutation.mutate(penalty);
+  };
 
-  const outstandingPenalties = penalties?.filter((p: any) => !p.isPaid && !p.isWaived) || [];
-  const outstandingAmount = outstandingPenalties.reduce((sum: number, p: any) => sum + parseFloat(p.amount || "0"), 0);
-  
-  const thisMonth = new Date().getMonth();
-  const thisYear = new Date().getFullYear();
-  const collectedThisMonth = penalties?.filter((p: any) => {
-    const appliedDate = new Date(p.appliedDate);
-    return p.isPaid && appliedDate.getMonth() === thisMonth && appliedDate.getFullYear() === thisYear;
-  }) || [];
-  const collectedAmount = collectedThisMonth.reduce((sum: number, p: any) => sum + parseFloat(p.amount || "0"), 0);
-  
-  const waivedPenalties = penalties?.filter((p: any) => p.isWaived) || [];
-  const waivedAmount = waivedPenalties.reduce((sum: number, p: any) => sum + parseFloat(p.amount || "0"), 0);
+  const handleSendNotice = (penalty: Penalty) => {
+    sendNoticeMutation.mutate(penalty);
+  };
+
+  const outstandingCount = penalties?.filter(p => !p.isPaid && !p.isWaived).length || 0;
+  const collectedCount = penalties?.filter(p => p.isPaid).length || 0;
+  const waivedCount = penalties?.filter(p => p.isWaived).length || 0;
 
   return (
     <div className="p-6 space-y-6">
@@ -139,10 +157,10 @@ export default function Penalties() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Outstanding Penalties</p>
-                <p className="text-3xl font-bold enterprise-warning mt-2">{outstandingAmount.toLocaleString()} RWF</p>
+                <p className="text-3xl font-bold enterprise-warning mt-2">{stats.outstandingAmount} RWF</p>
                 <p className="text-sm text-muted-foreground mt-1">
                   <AlertTriangle className="inline mr-1 h-3 w-3" />
-                  {outstandingPenalties.length} penalty cases
+                  {outstandingCount} penalty cases
                 </p>
               </div>
               <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center">
@@ -157,10 +175,10 @@ export default function Penalties() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Collected This Month</p>
-                <p className="text-3xl font-bold enterprise-success mt-2">{collectedAmount.toLocaleString()} RWF</p>
+                <p className="text-3xl font-bold enterprise-success mt-2">{stats.collectedAmount} RWF</p>
                 <p className="text-sm enterprise-success mt-1">
                   <CheckCircle className="inline mr-1 h-3 w-3" />
-                  {collectedThisMonth.length} penalties resolved
+                  {collectedCount} penalties resolved
                 </p>
               </div>
               <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
@@ -175,10 +193,10 @@ export default function Penalties() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Waived Penalties</p>
-                <p className="text-3xl font-bold enterprise-danger mt-2">{waivedAmount.toLocaleString()} RWF</p>
+                <p className="text-3xl font-bold enterprise-danger mt-2">{stats.waivedAmount} RWF</p>
                 <p className="text-sm text-muted-foreground mt-1">
                   <Ban className="inline mr-1 h-3 w-3" />
-                  {waivedPenalties.length} cases waived
+                  {waivedCount} cases waived
                 </p>
               </div>
               <div className="w-12 h-12 bg-red-100 dark:bg-red-900/20 rounded-lg flex items-center justify-center">
@@ -194,7 +212,7 @@ export default function Penalties() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Active Penalties</CardTitle>
-            <Select value={penaltyFilter} onValueChange={setPenaltyFilter}>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-48">
                 <SelectValue />
               </SelectTrigger>
@@ -222,8 +240,8 @@ export default function Penalties() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredPenalties.map((penalty: any) => {
-                const member = members?.find((m: any) => m.id === penalty.memberId);
+              {penalties?.map((penalty: Penalty) => {
+                const member = members?.find((m) => m.id === penalty.memberId);
                 
                 return (
                   <TableRow key={penalty.id}>
@@ -242,7 +260,7 @@ export default function Penalties() {
                     </TableCell>
                     <TableCell>{new Date(penalty.appliedDate).toLocaleDateString()}</TableCell>
                     <TableCell className="font-semibold enterprise-warning">
-                      {parseFloat(penalty.amount).toLocaleString()} RWF
+                      {parseFloat(penalty.amount.toString()).toLocaleString()} RWF
                     </TableCell>
                     <TableCell>{penalty.reason}</TableCell>
                     <TableCell>
@@ -264,11 +282,11 @@ export default function Penalties() {
                         <DropdownMenuContent align="end">
                           {!penalty.isPaid && !penalty.isWaived && (
                             <>
-                              <DropdownMenuItem onClick={() => handleMarkPaid(penalty.id)}>
+                              <DropdownMenuItem onClick={() => handleMarkAsPaid(penalty)}>
                                 <Check className="mr-2 h-4 w-4" />
                                 Mark as Paid
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleWaivePenalty(penalty.id)}>
+                              <DropdownMenuItem onClick={() => handleWaivePenalty(penalty)}>
                                 <X className="mr-2 h-4 w-4" />
                                 Waive Penalty
                               </DropdownMenuItem>
@@ -287,11 +305,47 @@ export default function Penalties() {
             </TableBody>
           </Table>
           
-          {filteredPenalties.length === 0 && (
+          {(!penalties || penalties.length === 0) && (
             <div className="text-center py-8 text-muted-foreground">
               No penalties found matching your criteria.
             </div>
           )}
+
+          {/* Pagination Controls */}
+          <div className="flex items-center justify-between mt-4">
+            <div className="flex items-center gap-2">
+              <Select value={pageSize.toString()} onValueChange={(value) => setPageSize(Number(value))}>
+                <SelectTrigger className="w-[100px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5 / page</SelectItem>
+                  <SelectItem value="10">10 / page</SelectItem>
+                  <SelectItem value="20">20 / page</SelectItem>
+                  <SelectItem value="50">50 / page</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-gray-500">
+                Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, total || 0)} of {total || 0}
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setPage(page - 1)}
+                disabled={page === 1}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setPage(page + 1)}
+                disabled={page >= (totalPages || 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

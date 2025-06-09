@@ -30,29 +30,117 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
+interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+interface Member {
+  id: number;
+  name: string;
+  memberId: string;
+  email: string;
+  isActive: boolean;
+  totalContributions: string;
+}
+
+interface Contribution {
+  id: number;
+  memberId: number;
+  amount: number;
+  paymentDate: string;
+  isPaid: boolean;
+  createdAt: string;
+}
+
+interface Loan {
+  id: number;
+  memberId: number;
+  amount: number;
+  issueDate: string;
+  isRepaid: boolean;
+  createdAt: string;
+}
+
+interface Penalty {
+  id: number;
+  memberId: number;
+  amount: number;
+  appliedDate: string;
+  isPaid: boolean;
+  isWaived: boolean;
+  createdAt: string;
+}
+
 export default function Reports() {
   const [reportMember, setReportMember] = useState("all");
   const [reportMonth, setReportMonth] = useState("all");
   const [reportType, setReportType] = useState("all");
   const [reportStatus, setReportStatus] = useState("all");
   const [emailAddress, setEmailAddress] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const { toast } = useToast();
 
-  const { data: members } = useQuery({
-    queryKey: ["/api/members"],
+  const { data: membersResponse } = useQuery<PaginatedResponse<Member>>({
+    queryKey: ["members", "reports"],
+    queryFn: async () => {
+      const response = await fetch("/api/members?pageSize=1000", {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch members");
+      }
+      return response.json();
+    },
   });
 
-  const { data: contributions } = useQuery({
-    queryKey: ["/api/contributions"],
+  const { data: contributionsResponse } = useQuery<PaginatedResponse<Contribution>>({
+    queryKey: ["contributions", "reports"],
+    queryFn: async () => {
+      const response = await fetch("/api/contributions?pageSize=1000", {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch contributions");
+      }
+      return response.json();
+    },
   });
 
-  const { data: loans } = useQuery({
-    queryKey: ["/api/loans"],
+  const { data: loansResponse } = useQuery<PaginatedResponse<Loan>>({
+    queryKey: ["loans", "reports"],
+    queryFn: async () => {
+      const response = await fetch("/api/loans?pageSize=1000", {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch loans");
+      }
+      return response.json();
+    },
   });
 
-  const { data: penalties } = useQuery({
-    queryKey: ["/api/penalties"],
+  const { data: penaltiesResponse } = useQuery<PaginatedResponse<Penalty>>({
+    queryKey: ["penalties", "reports"],
+    queryFn: async () => {
+      const response = await fetch("/api/penalties?pageSize=1000", {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch penalties");
+      }
+      return response.json();
+    },
   });
+
+  const members = membersResponse?.data || [];
+  const contributions = contributionsResponse?.data || [];
+  const loans = loansResponse?.data || [];
+  const penalties = penaltiesResponse?.data || [];
 
   const exportMutation = useMutation({
     mutationFn: async (format: string) => {
@@ -139,32 +227,32 @@ export default function Reports() {
     let data: any[] = [];
 
     // Combine all data sources
-    const contributionRecords = contributions?.map((c: any) => ({
+    const contributionRecords = (contributions || []).map((c: Contribution) => ({
       ...c,
       type: 'contribution',
       date: c.paymentDate || c.createdAt,
       status: c.isPaid ? 'paid' : 'unpaid',
       amount: c.amount,
-      member: members?.find((m: any) => m.id === c.memberId),
-    })) || [];
+      member: members.find((m: Member) => m.id === c.memberId),
+    }));
 
-    const loanRecords = loans?.map((l: any) => ({
+    const loanRecords = (loans || []).map((l: Loan) => ({
       ...l,
       type: 'loan',
       date: l.issueDate,
       status: l.isRepaid ? 'repaid' : 'active',
       amount: l.amount,
-      member: members?.find((m: any) => m.id === l.memberId),
-    })) || [];
+      member: members.find((m: Member) => m.id === l.memberId),
+    }));
 
-    const penaltyRecords = penalties?.map((p: any) => ({
+    const penaltyRecords = (penalties || []).map((p: Penalty) => ({
       ...p,
       type: 'penalty',
       date: p.appliedDate,
       status: p.isPaid ? 'paid' : p.isWaived ? 'waived' : 'outstanding',
       amount: p.amount,
-      member: members?.find((m: any) => m.id === p.memberId),
-    })) || [];
+      member: members.find((m: Member) => m.id === p.memberId),
+    }));
 
     data = [...contributionRecords, ...loanRecords, ...penaltyRecords];
 
@@ -192,6 +280,7 @@ export default function Reports() {
   };
 
   const filteredData = getFilteredData();
+  const paginatedData = filteredData.slice((page - 1) * pageSize, page * pageSize);
 
   const resetFilters = () => {
     setReportMember("all");

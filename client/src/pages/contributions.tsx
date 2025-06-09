@@ -22,158 +22,207 @@ import {
 import { Search, Plus } from "lucide-react";
 import PaymentModal from "@/components/modals/payment-modal";
 
+interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+interface Member {
+  id: number;
+  name: string;
+  email: string;
+  isActive: boolean;
+}
+
+interface Contribution {
+  id: number;
+  memberId: number;
+  amount: string;
+  month: string;
+  paymentDate: string | null;
+  isPaid: boolean;
+}
+
 export default function Contributions() {
   const [searchQuery, setSearchQuery] = useState("");
   const [monthFilter, setMonthFilter] = useState("all");
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  const { data: contributions, isLoading } = useQuery({
-    queryKey: ["/api/contributions"],
+  const { data: contributionsResponse, isLoading: isLoadingContributions } = useQuery<PaginatedResponse<Contribution>>({
+    queryKey: ["contributions", page, pageSize, searchQuery, monthFilter],
+    queryFn: async () => {
+      const response = await fetch(
+        `/api/contributions?page=${page}&pageSize=${pageSize}&search=${searchQuery}&month=${monthFilter}`,
+        {
+          credentials: "include",
+        }
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch contributions");
+      }
+      return response.json();
+    },
   });
 
-  const { data: members } = useQuery({
-    queryKey: ["/api/members"],
+  const { data: membersResponse, isLoading: isLoadingMembers } = useQuery<PaginatedResponse<Member>>({
+    queryKey: ["members"],
+    queryFn: async () => {
+      const response = await fetch("/api/members?pageSize=1000", {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch members");
+      }
+      return response.json();
+    },
   });
 
-  const filteredContributions = contributions?.filter((contribution: any) => {
-    const member = members?.find((m: any) => m.id === contribution.memberId);
-    const memberName = member?.name || '';
-    
-    const matchesSearch = memberName.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    if (!matchesSearch) return false;
-    
-    if (monthFilter === "all") return true;
-    if (monthFilter === "current") {
-      const currentMonth = new Date().toISOString().slice(0, 7);
-      return contribution.month === currentMonth;
-    }
-    
-    return true;
-  }) || [];
+  const members = membersResponse?.data || [];
+  const contributions = contributionsResponse?.data || [];
+  const isLoading = isLoadingContributions || isLoadingMembers;
 
-  if (isLoading) {
-    return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-muted rounded w-48"></div>
-          <div className="h-64 bg-muted rounded"></div>
-        </div>
-      </div>
-    );
-  }
+  const getMemberName = (memberId: number) => {
+    const member = members.find((m) => m.id === memberId);
+    return member ? member.name : "Unknown Member";
+  };
 
   return (
-    <>
-      <div className="p-6 space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">Contributions Management</h1>
-            <p className="text-muted-foreground">Track and manage monthly member contributions</p>
+    <div className="container mx-auto py-10">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Contributions</CardTitle>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowPaymentModal(true)}
+            >
+              <Plus className="mr-2 h-4 w-4" /> Record Payment
+            </Button>
           </div>
-          <Button onClick={() => setShowPaymentModal(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Record Payment
-          </Button>
-        </div>
-
-        <div className="flex gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center py-4">
             <Input
-              placeholder="Search members..."
+              placeholder="Search..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 w-64"
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className="max-w-sm"
             />
+            <Select
+              value={monthFilter}
+              onValueChange={setMonthFilter}
+            >
+              <SelectTrigger className="w-[180px] ml-2">
+                <SelectValue placeholder="Filter by month" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Months</SelectItem>
+                <SelectItem value="current">Current Month</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={monthFilter} onValueChange={setMonthFilter}>
-            <SelectTrigger className="w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Months</SelectItem>
-              <SelectItem value="current">Current Month</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Contribution Records</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Member</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Month</TableHead>
+                <TableHead>Payment Date</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
                 <TableRow>
-                  <TableHead>Member</TableHead>
-                  <TableHead>Month</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Payment Date</TableHead>
-                  <TableHead>Late Fee</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableCell colSpan={5} className="text-center">
+                    Loading...
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredContributions.map((contribution: any) => {
-                  const member = members?.find((m: any) => m.id === contribution.memberId);
-                  const isLate = contribution.paymentDate && new Date(contribution.paymentDate) > new Date(contribution.dueDate);
-                  
-                  return (
-                    <TableRow key={contribution.id}>
-                      <TableCell>
-                        <div className="font-medium">{member?.name || 'Unknown Member'}</div>
-                        <div className="text-sm text-muted-foreground">ID: {member?.memberId}</div>
-                      </TableCell>
-                      <TableCell>{contribution.month}</TableCell>
-                      <TableCell className="font-semibold">
-                        {parseFloat(contribution.amount).toLocaleString()} RWF
-                      </TableCell>
-                      <TableCell>{new Date(contribution.dueDate).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        {contribution.paymentDate ? 
-                          new Date(contribution.paymentDate).toLocaleDateString() : 
-                          '-'
-                        }
-                      </TableCell>
-                      <TableCell>
-                        {parseFloat(contribution.lateFee || "0") > 0 ? (
-                          <span className="text-orange-600 font-medium">
-                            {parseFloat(contribution.lateFee).toLocaleString()} RWF
-                          </span>
-                        ) : (
-                          '-'
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={
-                          contribution.isPaid ? 
-                            (isLate ? "secondary" : "default") : 
-                            "destructive"
-                        }>
-                          {contribution.isPaid ? 
-                            (isLate ? "Paid Late" : "Paid") : 
-                            "Unpaid"
-                          }
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-            
-            {filteredContributions.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                No contribution records found.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              ) : contributions.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center">
+                    No contributions found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                contributions.map((contribution) => (
+                  <TableRow key={contribution.id}>
+                    <TableCell>{getMemberName(contribution.memberId)}</TableCell>
+                    <TableCell>${contribution.amount}</TableCell>
+                    <TableCell>{new Date(contribution.month).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}</TableCell>
+                    <TableCell>
+                      {contribution.paymentDate
+                        ? new Date(contribution.paymentDate).toLocaleDateString()
+                        : "Not paid"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={contribution.isPaid ? "success" : "destructive"}
+                      >
+                        {contribution.isPaid ? "Paid" : "Pending"}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
 
-      <PaymentModal open={showPaymentModal} onOpenChange={setShowPaymentModal} />
-    </>
+          {/* Pagination Controls */}
+          <div className="flex items-center justify-between mt-4">
+            <div className="flex items-center gap-2">
+              <Select
+                value={pageSize.toString()}
+                onValueChange={(value) => setPageSize(Number(value))}
+              >
+                <SelectTrigger className="w-[100px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5 / page</SelectItem>
+                  <SelectItem value="10">10 / page</SelectItem>
+                  <SelectItem value="20">20 / page</SelectItem>
+                  <SelectItem value="50">50 / page</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-gray-500">
+                Showing {((page - 1) * pageSize) + 1} to{" "}
+                {Math.min(page * pageSize, contributionsResponse?.total || 0)} of{" "}
+                {contributionsResponse?.total || 0}
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setPage(page - 1)}
+                disabled={page === 1}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setPage(page + 1)}
+                disabled={!contributionsResponse || page >= contributionsResponse.totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {showPaymentModal && (
+        <PaymentModal
+          open={showPaymentModal}
+          onOpenChange={setShowPaymentModal}
+        />
+      )}
+    </div>
   );
 }

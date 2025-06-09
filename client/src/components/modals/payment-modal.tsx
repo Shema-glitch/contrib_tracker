@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useMembers } from "@/hooks/use-members";
 import {
   Dialog,
   DialogContent,
@@ -55,9 +56,7 @@ export default function PaymentModal({ open, onOpenChange }: PaymentModalProps) 
   const queryClient = useQueryClient();
   const [showOtp, setShowOtp] = useState(false);
 
-  const { data: members } = useQuery({
-    queryKey: ["/api/members"],
-  });
+  const { members, isLoading: isLoadingMembers } = useMembers();
 
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
