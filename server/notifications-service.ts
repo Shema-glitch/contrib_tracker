@@ -1,23 +1,23 @@
 import { db } from "./db";
 import { notifications } from "../shared/schema";
-import { v4 as uuidv4 } from "uuid";
 
 export type NotificationType = "info" | "warning" | "success" | "error";
 
 export async function createNotification(
-  userId: string,
+  userId: number,
   title: string,
   message: string,
-  type: NotificationType
+  type: NotificationType,
+  data?: Record<string, unknown>
 ) {
   try {
     await db.insert(notifications).values({
-      id: uuidv4(),
       userId,
       title,
       message,
       type,
-      read: false,
+      is_read: false,
+      data: data || {},
     });
   } catch (error) {
     console.error("Failed to create notification:", error);
@@ -34,7 +34,7 @@ export async function createNotificationForOverdueContributions(
 }
 
 export async function createNotificationForLoanRequest(
-  userId: string,
+  userId: number,
   memberName: string
 ) {
   const title = "New Loan Request";

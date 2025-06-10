@@ -60,7 +60,7 @@ export const penalties = pgTable("penalties", {
 // Notifications table
 export const notifications = pgTable("notifications", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => members.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
   type: varchar("type", { length: 50 }).notNull(),
   title: text("title").notNull(),
   message: text("message").notNull(),
@@ -144,9 +144,9 @@ export const userRelations = relations(users, ({ many }) => ({
 }));
 
 export const notificationsRelations = relations(notifications, ({ one }) => ({
-  member: one(members, {
+  user: one(users, {
     fields: [notifications.userId],
-    references: [members.id],
+    references: [users.id],
   }),
 }));
 

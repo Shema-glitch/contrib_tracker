@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -58,16 +58,38 @@ export default function PaymentModal({ open, onOpenChange }: PaymentModalProps) 
 
   const { members, isLoading: isLoadingMembers } = useMembers();
 
+  // Fetch contribution amount from settings
+  const { data: contributionAmount } = useQuery({
+    queryKey: ["/api/settings/contributionAmount"],
+    queryFn: async () => {
+      const response = await fetch("/api/settings/contributionAmount", {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch contribution amount");
+      }
+      const data = await response.json();
+      return data.value || "5000"; // Fallback to 5000 if not set
+    },
+  });
+
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
-      amount: "5000",
+      amount: contributionAmount || "5000",
       isPaid: true,
       applyLateFee: false,
       paymentDate: new Date().toISOString().split('T')[0],
       dueDate: new Date().toISOString().split('T')[0],
     },
   });
+
+  // Update form when contribution amount changes
+  useEffect(() => {
+    if (contributionAmount) {
+      form.setValue("amount", contributionAmount);
+    }
+  }, [contributionAmount, form]);
 
   const recordPaymentMutation = useMutation({
     mutationFn: async (data: PaymentFormData) => {

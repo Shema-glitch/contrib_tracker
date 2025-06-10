@@ -158,6 +158,7 @@ export class Storage {
         .insert(notifications)
         .values({
           ...data,
+          data: data.data || {},
           createdAt: new Date()
         })
         .returning();
@@ -341,11 +342,33 @@ export class Storage {
   }
 
   async createContribution(data: InsertContribution) {
-    const [contribution] = await db
-      .insert(contributions)
-      .values(data)
-      .returning();
-    return contribution;
+    try {
+      const [contribution] = await db
+        .insert(contributions)
+        .values(data)
+        .returning();
+
+      // Get member details for notification
+      const member = await this.getMemberById(data.memberId);
+      if (member) {
+        // Get the user ID associated with this member
+        const user = await db.query.users.findFirst({
+          where: eq(users.email, member.email)
+        });
+        if (user) {
+          await this.createContributionNotification(
+            user.id,
+            Number(data.amount),
+            member.name
+          );
+        }
+      }
+
+      return contribution;
+    } catch (error) {
+      console.error("Error creating contribution:", error);
+      return null;
+    }
   }
 
   // Loan methods
@@ -384,8 +407,33 @@ export class Storage {
   }
 
   async createLoan(data: InsertLoan) {
-    const [loan] = await db.insert(loans).values(data).returning();
-    return loan;
+    try {
+      const [loan] = await db
+        .insert(loans)
+        .values(data)
+        .returning();
+
+      // Get member details for notification
+      const member = await this.getMemberById(data.memberId);
+      if (member) {
+        // Get the user ID associated with this member
+        const user = await db.query.users.findFirst({
+          where: eq(users.email, member.email)
+        });
+        if (user) {
+          await this.createLoanNotification(
+            user.id,
+            Number(data.amount),
+            member.name
+          );
+        }
+      }
+
+      return loan;
+    } catch (error) {
+      console.error("Error creating loan:", error);
+      return null;
+    }
   }
 
   // Penalty methods
@@ -497,6 +545,7 @@ export class Storage {
   async getRecentActivity() {
     const recentContributions = await db
       .select({
+        id: contributions.id,
         type: sql<string>`'contribution'`,
         date: contributions.paymentDate,
         description: sql<string>`'Contribution payment'`,
@@ -512,6 +561,7 @@ export class Storage {
 
     const recentLoans = await db
       .select({
+        id: loans.id,
         type: sql<string>`'loan'`,
         date: loans.issueDate,
         description: sql<string>`'Loan issued'`,
@@ -526,6 +576,10 @@ export class Storage {
 
     // Combine and sort recent activities
     const activities = [...recentContributions, ...recentLoans]
+      .map(activity => ({
+        ...activity,
+        date: activity.date || new Date().toISOString()
+      }))
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 10);
 
@@ -633,6 +687,62 @@ export class Storage {
     }
 
     return data.sort((a, b) => b.date.getTime() - a.date.getTime());
+  }
+
+  // Test notification
+  async createTestNotification(userId: number) {
+    return this.insertNotification({
+      userId,
+      type: 'info',
+      title: 'Test Notification',
+      message: 'This is a test notification to verify the system is working',
+      data: {
+        test: true,
+        timestamp: new Date().toISOString()
+      }
+    });
+  }
+
+  async createContributionNotification(userId: number, amount: number, memberName: string) {
+    return this.insertNotification({
+      userId,
+      type: 'success',
+      title: 'Contribution Recorded',
+      message: `Your contribution of ${amount.toLocaleString()} RWF has been recorded successfully.`,
+      data: {
+        amount,
+        memberName,
+        type: 'contribution'
+      }
+    });
+  }
+
+  async createLoanNotification(userId: number, amount: number, memberName: string) {
+    return this.insertNotification({
+      userId,
+      type: 'success',
+      title: 'Loan Approved',
+      message: `Your loan request for ${amount.toLocaleString()} RWF has been approved.`,
+      data: {
+        amount,
+        memberName,
+        type: 'loan'
+      }
+    });
+  }
+
+  async createReminderNotification(userId: number, amount: number, memberName: string) {
+    return this.insertNotification({
+      userId,
+      type: 'warning',
+      title: 'Contribution Reminder',
+      message: `Reminder: Your monthly contribution of ${amount.toLocaleString()} RWF is due soon.`,
+      data: {
+        amount,
+        memberName,
+        type: 'reminder'
+      }
+    });
   }
 }
 
