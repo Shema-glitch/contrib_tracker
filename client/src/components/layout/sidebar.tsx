@@ -67,8 +67,9 @@ export default function Sidebar() {
             <Coins className="text-primary-foreground text-lg" />
           </motion.div>
           <div className="ml-3">
-            <h1 className="text-lg font-semibold text-sidebar-foreground">FinanceFlow</h1>
-            <p className="text-xs text-muted-foreground">Enterprise Manager</p>
+            <h1 className="text-lg font-semibold text-sidebar-foreground">FundSync</h1>
+            <p className="text-xs text-muted-foreground">Contribution Tracker</p>
+            {/* <p className="text-xs text-muted-foreground">Enterprise Manager</p> */}
           </div>
         </div>
       </motion.div>

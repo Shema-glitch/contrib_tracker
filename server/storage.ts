@@ -114,9 +114,9 @@ export class Storage {
     const [otpToken] = await db
       .insert(otpTokens)
       .values({
-        email,
-        token,
-        expiresAt,
+      email,
+      token,
+      expiresAt,
       })
       .returning();
     return otpToken;
@@ -206,7 +206,7 @@ export class Storage {
 
   async getMember(id: number) {
     try {
-      const [member] = await db
+    const [member] = await db
         .select({
           id: members.id,
           name: members.name,
@@ -260,13 +260,13 @@ export class Storage {
             '[]'::jsonb
           )::json as penalties`
         })
-        .from(members)
+      .from(members)
         .leftJoin(contributions, eq(contributions.memberId, members.id))
         .leftJoin(loans, eq(loans.memberId, members.id))
         .leftJoin(penalties, eq(penalties.memberId, members.id))
-        .where(eq(members.id, id))
+      .where(eq(members.id, id))
         .groupBy(members.id)
-        .limit(1);
+      .limit(1);
 
       return member || null;
     } catch (error) {
@@ -343,10 +343,16 @@ export class Storage {
 
   async createContribution(data: InsertContribution) {
     try {
-      const [contribution] = await db
-        .insert(contributions)
-        .values(data)
-        .returning();
+      // Convert YYYY-MM to YYYY-MM-01 for the month field
+      const monthDate = new Date(data.month + '-01');
+      
+    const [contribution] = await db
+      .insert(contributions)
+        .values({
+          ...data,
+          month: monthDate.toISOString().split('T')[0] // Convert to YYYY-MM-DD
+        })
+      .returning();
 
       // Get member details for notification
       const member = await this.getMemberById(data.memberId);
@@ -364,7 +370,7 @@ export class Storage {
         }
       }
 
-      return contribution;
+    return contribution;
     } catch (error) {
       console.error("Error creating contribution:", error);
       return null;
@@ -429,7 +435,7 @@ export class Storage {
         }
       }
 
-      return loan;
+    return loan;
     } catch (error) {
       console.error("Error creating loan:", error);
       return null;

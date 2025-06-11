@@ -117,4 +117,125 @@ router.post("/test", async (req: Request, res: Response) => {
   }
 });
 
+export async function createContributionNotification(
+  userId: number,
+  amount: number,
+  memberName: string
+) {
+  try {
+    console.log(`Creating contribution notification for user ${userId}`);
+    const [notification] = await db
+      .insert(notifications)
+      .values({
+        userId,
+        type: "contribution",
+        title: "New Contribution Recorded",
+        message: `A contribution of $${amount} has been recorded for ${memberName}`,
+        data: {
+          amount,
+          memberName,
+          timestamp: new Date().toISOString(),
+        },
+        is_read: false,
+      })
+      .returning();
+
+    console.log("Contribution notification created:", notification);
+    return notification;
+  } catch (error) {
+    console.error("Error creating contribution notification:", error);
+    throw error;
+  }
+}
+
+export async function createLoanNotification(
+  userId: number,
+  amount: number,
+  memberName: string
+) {
+  try {
+    console.log(`Creating loan notification for user ${userId}`);
+    const [notification] = await db
+      .insert(notifications)
+      .values({
+        userId,
+        type: "loan",
+        title: "New Loan Granted",
+        message: `A loan of $${amount} has been granted to ${memberName}`,
+        data: {
+          amount,
+          memberName,
+          timestamp: new Date().toISOString(),
+        },
+        is_read: false,
+      })
+      .returning();
+
+    console.log("Loan notification created:", notification);
+    return notification;
+  } catch (error) {
+    console.error("Error creating loan notification:", error);
+    throw error;
+  }
+}
+
+export async function createReminderNotification(
+  userId: number,
+  type: "contribution" | "loan",
+  amount: number,
+  dueDate: Date
+) {
+  try {
+    console.log(`Creating reminder notification for user ${userId}`);
+    const [notification] = await db
+      .insert(notifications)
+      .values({
+        userId,
+        type: "reminder",
+        title: `${type === "contribution" ? "Contribution" : "Loan"} Reminder`,
+        message: `Reminder: Your ${type} of $${amount} is due on ${dueDate.toLocaleDateString()}`,
+        data: {
+          type,
+          amount,
+          dueDate: dueDate.toISOString(),
+          timestamp: new Date().toISOString(),
+        },
+        is_read: false,
+      })
+      .returning();
+
+    console.log("Reminder notification created:", notification);
+    return notification;
+  } catch (error) {
+    console.error("Error creating reminder notification:", error);
+    throw error;
+  }
+}
+
+export async function markNotificationAsRead(notificationId: number) {
+  try {
+    const [notification] = await db
+      .update(notifications)
+      .set({ is_read: true })
+      .where(eq(notifications.id, notificationId))
+      .returning();
+    return notification;
+  } catch (error) {
+    console.error("Error marking notification as read:", error);
+    throw error;
+  }
+}
+
+export async function markAllNotificationsAsRead(userId: number) {
+  try {
+    await db
+      .update(notifications)
+      .set({ is_read: true })
+      .where(eq(notifications.userId, userId));
+  } catch (error) {
+    console.error("Error marking all notifications as read:", error);
+    throw error;
+  }
+}
+
 export default router;

@@ -19,14 +19,17 @@ export const members = pgTable("members", {
 // Contributions table
 export const contributions = pgTable("contributions", {
   id: serial("id").primaryKey(),
-  memberId: integer("member_id").references(() => members.id).notNull(),
-  month: varchar("month", { length: 7 }).notNull(), // YYYY-MM format
+  memberId: integer("member_id")
+    .notNull()
+    .references(() => members.id, { onDelete: "cascade" }),
+  month: date("month").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   paymentDate: date("payment_date"),
   dueDate: date("due_date").notNull(),
   isPaid: boolean("is_paid").default(false),
   lateFee: decimal("late_fee", { precision: 10, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Loans table

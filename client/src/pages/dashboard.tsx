@@ -55,7 +55,7 @@ export default function Dashboard() {
     queryFn: async () => {
       const response = await fetch("/api/dashboard/stats", {
         credentials: "include",
-      });
+  });
       if (!response.ok) {
         throw new Error("Failed to fetch dashboard stats");
       }
@@ -68,7 +68,7 @@ export default function Dashboard() {
     queryFn: async () => {
       const response = await fetch("/api/members?pageSize=1000", {
         credentials: "include",
-      });
+  });
       if (!response.ok) {
         throw new Error("Failed to fetch members");
       }
@@ -81,7 +81,7 @@ export default function Dashboard() {
     queryFn: async () => {
       const response = await fetch("/api/dashboard/recent-activity", {
         credentials: "include",
-      });
+  });
       if (!response.ok) {
         throw new Error("Failed to fetch recent activity");
       }
@@ -92,8 +92,8 @@ export default function Dashboard() {
   const members = membersResponse?.data || [];
   const filteredMembers = searchQuery
     ? members.filter((member) =>
-        member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        member.memberId.toLowerCase().includes(searchQuery.toLowerCase())
+    member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    member.memberId.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : members;
 
@@ -120,7 +120,7 @@ export default function Dashboard() {
             {recentActivity?.length === 0 ? (
               <p className="text-center text-muted-foreground">No recent activity</p>
             ) : (
-              <div className="space-y-4">
+            <div className="space-y-4">
                 {recentActivity?.map((activity) => (
                   <div key={`activity-${activity.id}`} className="flex items-center justify-between">
                     <div>
@@ -129,10 +129,10 @@ export default function Dashboard() {
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {new Date(activity.date).toLocaleDateString()}
-                    </p>
-                  </div>
-                ))}
-              </div>
+                      </p>
+                </div>
+              ))}
+            </div>
             )}
           </CardContent>
         </Card>
@@ -157,28 +157,28 @@ export default function Dashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
+            <Table>
+              <TableHeader>
+                <TableRow>
                 <TableHead>Member ID</TableHead>
                 <TableHead>Name</TableHead>
-                <TableHead>Total Contributions</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+                  <TableHead>Total Contributions</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
               {membersLoading ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center">
                     Loading members...
-                  </TableCell>
+                      </TableCell>
                 </TableRow>
               ) : filteredMembers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center">
                     No members found
-                  </TableCell>
+                      </TableCell>
                 </TableRow>
               ) : (
                 filteredMembers.map((member) => (
@@ -186,29 +186,29 @@ export default function Dashboard() {
                     <TableCell>{member.memberId}</TableCell>
                     <TableCell>{member.name}</TableCell>
                     <TableCell>${member.totalContributions}</TableCell>
-                    <TableCell>
+                      <TableCell>
                       <Badge variant={member.isActive ? "default" : "secondary"}>
                         {member.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
                       <div className="flex items-center gap-2">
                         <Button variant="ghost" size="icon">
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                            <Eye className="h-4 w-4" />
+                          </Button>
                         <Button variant="ghost" size="icon">
                           <CreditCard className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon">
-                          <Mail className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                            <Mail className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
                 ))
               )}
-            </TableBody>
-          </Table>
+              </TableBody>
+            </Table>
         </CardContent>
       </Card>
     </div>

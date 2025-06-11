@@ -37,13 +37,13 @@ const pgStore = pgSession(session);
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "your-secret-key",
-    resave: false,
-    saveUninitialized: false,
+  resave: false,
+  saveUninitialized: false,
     rolling: true, // Refresh session with each request
-    cookie: {
+  cookie: {
       secure: process.env.NODE_ENV === "production", // Only use secure in production
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
       sameSite: "lax",
       path: "/"
     },
